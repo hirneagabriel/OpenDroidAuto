@@ -71,11 +71,13 @@ public class ConnectionWidget extends AppWidgetProvider {
             status = context.getString(R.string.widget_connection_no_phone);
         }
 
-        views.setImageViewResource(R.id.widget_connection_background, ready ? R.drawable.tile_ready : R.drawable.tile_idle);
-        views.setInt(R.id.widget_connection_logo, "setAlpha", ready ? 255 : 110);
+        boolean small = layout == R.layout.widget_connection_small;
+        views.setImageViewResource(R.id.widget_connection_background, ready ? R.drawable.widget_tile_ready : R.drawable.widget_tile_idle);
+        // the large tile's logo is a faint white motif; the small tile shows the logo itself
+        views.setInt(R.id.widget_connection_logo, "setAlpha", small ? (ready ? 255 : 130) : (ready ? 80 : 50));
         views.setTextViewText(R.id.widget_connection_status, status);
-        views.setTextColor(R.id.widget_connection_title, ready ? 0xFFFFFFFF : 0xFFB0B0B0);
-        views.setTextColor(R.id.widget_connection_status, ready ? 0xFFE2F0FF : 0xFF909090);
+        views.setTextColor(R.id.widget_connection_title, ready ? 0xFFFFFFFF : 0xFFE0E0E0);
+        views.setTextColor(R.id.widget_connection_status, ready ? 0xFFD6E6FF : 0xFFC0C4C8);
 
         Intent intent;
         if (ready) {

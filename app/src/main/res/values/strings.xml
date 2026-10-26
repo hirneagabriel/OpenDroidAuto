@@ -115,6 +115,7 @@
 	<string name="widget_start_label">Start</string>
 
 	<string name="widget_connection_title">Android Auto</string>
+	<string name="widget_connection_label">Android\nAuto</string>
 	<string name="widget_connection_no_phone">No phone</string>
 	<string name="widget_connection_active">Running</string>
 	<string name="widget_connection_preview_text">Android Auto</string>

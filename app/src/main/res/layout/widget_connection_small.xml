@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- one-cell home screen tile: logo and status only (same view ids as widget_connection) -->
+<!-- one-cell home screen tile: the car-style tile with the logo and status centred (same view ids as widget_connection) -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_connection"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="4dp">
+    android:padding="2dp">
 
     <ImageView
         android:id="@+id/widget_connection_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@null"
-        android:scaleType="fitXY"
-        android:src="@drawable/tile_idle" />
+        android:scaleType="centerCrop"
+        android:src="@drawable/widget_tile_idle" />
 
     <LinearLayout
         android:layout_width="match_parent"
