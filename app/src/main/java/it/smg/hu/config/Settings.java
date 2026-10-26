@@ -8,6 +8,7 @@ import android.preference.PreferenceManager;
 
 import androidx.annotation.Keep;
 
+import it.smg.hu.util.DeviceUtils;
 import it.smg.libs.common.ILog;
 import it.smg.libs.aasdk.configuration.ICarConfiguration;
 
@@ -46,6 +47,14 @@ public class Settings {
         advanced = new Advanced();
         video = new Video();
         audio = new Audio();
+
+        // off-car development on the emulator: no Honda services available, connect over WiFi
+        if (DeviceUtils.isEmulator && !SP.contains(Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION)) {
+            SP.edit()
+                    .putBoolean(Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION, false)
+                    .putBoolean(Advanced.ADVANCED_ENABLE_WIFI, true)
+                    .apply();
+        }
     }
 
     public class Car extends Base implements ICarConfiguration {

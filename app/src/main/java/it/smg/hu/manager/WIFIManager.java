@@ -12,6 +12,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import it.smg.hu.util.DeviceUtils;
 import it.smg.libs.common.Log;
 
 public class WIFIManager {
@@ -55,6 +56,11 @@ public class WIFIManager {
     }
 
     private String ipAddress(){
+        // the emulator's gateway is a virtual router; 10.0.2.2 is the host, where the phone's head unit server is adb-forwarded
+        if (DeviceUtils.isEmulator) {
+            return "10.0.2.2";
+        }
+
         WifiManager wifi = (WifiManager) ctx_.getSystemService(Context.WIFI_SERVICE);
         DhcpInfo d = wifi.getDhcpInfo();
 

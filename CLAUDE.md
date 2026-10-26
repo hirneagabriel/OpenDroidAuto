@@ -8,12 +8,16 @@ OpenDroidAuto is an Android Auto head-unit app for legacy car infotainment units
 
 ## Build
 
-Requires JDK 17 and **NDK 17.2.4988734** exactly (set in root `build.gradle` `ext.ndkVersion`). Only the `armeabi-v7a` ABI is built.
+Requires a JDK that Gradle 8.11 can run on (17 or 21; Android Studio's bundled JBR 25 is too new) and **NDK 17.2.4988734** exactly (set in root `build.gradle` `ext.ndkVersion`). NDK 17's clang needs `libtinfo.so.5`; on distros that only ship v6, symlink `libtinfo.so.6` as `libtinfo.so.5` into `<ndk>/toolchains/llvm/prebuilt/linux-x86_64/lib64/`.
 
 ```
-./gradlew :common:assemble      # must be built first: it publishes the libcommon prefab package the other native modules import
+./gradlew :common:assemble      # must be a separate, earlier invocation: it publishes the libcommon prefab package the other native modules import
 ./gradlew assembleRelease       # APK -> app/build/outputs/apk/release/HondaAppCenter_A1.apk
 ```
+
+Running both tasks in one Gradle call (or switching ABI) caches a header-only prefab `common` module and the `aasdk` link fails with undefined `JNIBase::*` references; delete `aasdk/build/.cxx` and `omxvideocodec/build/.cxx` and rebuild.
+
+The ABI defaults to `armeabi-v7a` (the car); pass `-Pabis=x86` to every Gradle command to build for the emulator.
 
 CI (`.github/workflows/main.yml`) runs `./gradlew :common:build` then `./gradlew assembleRelease` on tag push and attaches the APK to a GitHub release. Release builds are signed with the debug key and minified (ProGuard) only in `:app`.
 
@@ -23,7 +27,17 @@ Shared versions (`compileSdk`, `minSdk`/`targetSdk` = 15, `versionCode`/`version
 
 ## Debugging
 
-`Settings.advanced.hondaIntegrationEnabled()` must be false when debugging off-car, otherwise startup fails (it binds to Fujitsu Ten system services via the AIDL in `app/src/main/aidl/com/fujitsu_ten/`).
+`Settings.advanced.hondaIntegrationEnabled()` must be false when debugging off-car, otherwise startup fails (it binds to Fujitsu Ten system services via the AIDL in `app/src/main/aidl/com/fujitsu_ten/`). On the emulator this is done automatically on first run (`DeviceUtils.isEmulator`).
+
+### Running on the emulator
+
+Use a 32-bit **x86** AVD (e.g. API 30 Google APIs x86, ~800×480 landscape to match the head unit; large resolutions have crashed the emulator once video starts). On the emulator the app turns off Honda integration, turns on WiFi mode, decodes video with `NativeVideoOutput` (MediaCodec), and connects to `10.0.2.2:5277` (the host) instead of the WiFi gateway.
+
+1. Phone on USB with adb debugging; in Android Auto settings enable developer mode (tap Version ~10×), then ⋮ → "Start head unit server".
+2. `adb -s <phone> forward tcp:5277 tcp:5277` (lost on replug).
+3. Build with `-Pabis=x86`, `adb -s emulator-5554 install -r app/build/outputs/apk/debug/HondaAppCenter_A1.apk`, open the app, press START WIFI.
+
+The phone's head unit server accepts the first TCP connection as the head unit, so don't probe port 5277 before connecting. If Android Auto crashes with `IllegalStateException: Already connected`, `adb -s <phone> shell am force-stop com.google.android.projection.gearhead` and start the server again.
 
 ## Module layout
 

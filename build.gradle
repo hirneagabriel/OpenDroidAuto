@@ -11,6 +11,6 @@ ext {
     targetSdk = 15
     versionCode = 200502 // major (x)-minor (xxx)-fix (xx)
     versionName =  "2.5.2"
-    SupportedABIs = ['armeabi-v7a']
+    SupportedABIs = (findProperty('abis') ?: 'armeabi-v7a').split(',') as List // e.g. -Pabis=x86 for the emulator
     ndkVersion = '17.2.4988734'
 }
