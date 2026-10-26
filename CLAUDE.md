@@ -39,7 +39,7 @@ Use a 32-bit **x86** AVD (e.g. API 30 Google APIs x86, ~800×480 landscape to ma
 
 The phone's head unit server accepts the first TCP connection as the head unit, so don't probe port 5277 before connecting. If Android Auto crashes with `IllegalStateException: Already connected`, `adb -s <phone> shell am force-stop com.google.android.projection.gearhead` and start the server again.
 
-`tools/honda-emulator.sh [avd] [cpu-quota]` starts the AVD under a systemd CPU quota (default `100%` = one host core) as a rough stand-in for the head unit. The `Honda_Emulator` AVD is configured with 800×480 @160 dpi, 1 GB RAM, 64 MB `vm.heapSize`, 2 cores. It still runs x86 code at host speed and uses `NativeVideoOutput`, not the car's `OMXVideoOutput`, so CPU and video numbers only matter when measured on the car.
+`tools/honda-emulator.sh [avd] [cpu-quota] [app-heap]` starts the AVD under a systemd CPU quota (default `100%` = one host core) as a rough stand-in for the head unit, and after boot sets the per-app heap limit (default `64m`) via `adb root` + `dalvik.vm.heapgrowthlimit` + zygote restart. That's needed because the emulator ignores `hw.ramSize`/`vm.heapSize` below its minimums for API 30 images (it forces 2 GB RAM). The `Honda_Emulator` AVD is 800×480 @160 dpi with 2 cores. It still runs x86 code at host speed and uses `NativeVideoOutput`, not the car's `OMXVideoOutput`, so CPU and video numbers only matter when measured on the car.
 
 ## Target hardware and resource measurement
 
