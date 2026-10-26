@@ -11,6 +11,9 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import androidx.annotation.Keep;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import it.smg.hu.R;
@@ -54,7 +57,11 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 
     private Handler mainHandler_;
 
-    private boolean isRunning_;
+    private volatile boolean isRunning_;
+
+    // sessions are torn down here, never on the protocol's own worker threads (errors and quit requests arrive on
+    // those): stopping joins the workers and deletes their io_service, which a worker can't do to itself
+    private final ExecutorService stopExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODA stop"));
 
     // for the widget and USB auto-start, which have no binding to the service
     private static volatile boolean sessionActive_;
@@ -157,7 +164,12 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
         androidAutoEntity_.gainFocus();
     }
 
+    /** Ends the session, asynchronously on the stop thread. */
     public void stop(){
+        stopExecutor_.execute(this::stopNow);
+    }
+
+    private synchronized void stopNow(){
         if (!isRunning_) {
             if (Log.isInfo()) Log.i(TAG, "service not running, already stopped?");
             return;
