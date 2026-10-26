@@ -5,6 +5,7 @@
 #include <utils/RefBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <queue>
+#include <map>
 #include <thread>
 #include <Data.hpp>
 
@@ -24,6 +25,10 @@ public:
     void queueBuffer(MediaBuffer* buffer);
     // longest the input queue got since the previous call (frames waiting for the decoder)
     int takeMaxQueued();
+    // called by the decoder when the frame with this timestamp was handed to the screen
+    void onRendered(int64_t timeUs);
+    // arrival-to-screen time since the previous call: {count, avg us, max us}
+    void takeLatency(int64_t out[3]);
 
     status_t pause() override {
         return ERROR_UNSUPPORTED;
@@ -47,6 +52,10 @@ private:
 
     bool quitFlag_;
     int maxQueued_ = 0;
+    std::map<int64_t, int64_t> arrivalUs_; // frame timestamp -> arrival (steady clock)
+    int64_t latencyCount_ = 0;
+    int64_t latencySumUs_ = 0;
+    int64_t latencyMaxUs_ = 0;
 
     MediaBuffer* nextBuffer();
 };

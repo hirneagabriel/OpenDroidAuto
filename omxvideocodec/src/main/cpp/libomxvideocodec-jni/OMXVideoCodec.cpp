@@ -107,12 +107,18 @@ void OMXVideoCodec::setSps(common::DataConstBuffer &b){
     omxSource_->getFormat()->setData(kKeyAVCC, kTypeAVCC, b.cdata, b.size);
 }
 
-void OMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued) {
+void OMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs) {
     rendered = 0;
     maxQueued = 0;
+    latencyAvgUs = 0;
+    latencyMaxUs = 0;
     if (decoderThreadInitialized_ && omxDecoder_ != nullptr && omxSource_ != nullptr) {
         rendered = omxDecoder_->takeRenderedFrames();
         maxQueued = omxSource_->takeMaxQueued();
+        int64_t latency[3];
+        omxSource_->takeLatency(latency);
+        latencyAvgUs = latency[1];
+        latencyMaxUs = latency[2];
     }
 }
 

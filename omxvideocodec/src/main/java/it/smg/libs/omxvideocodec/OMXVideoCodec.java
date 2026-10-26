@@ -72,7 +72,7 @@ public class OMXVideoCodec {
         return sps;
     }
 
-    /** {frames rendered, peak decoder input queue length} since the previous call. */
+    /** {frames rendered, peak decoder input queue length, arrival-to-screen avg ms, max ms} since the previous call. */
     public int[] takeStats(){
         return nativeTakeStats();
     }

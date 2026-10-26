@@ -19,7 +19,7 @@ public:
     void shutdown();
     void queueBuffer(common::DataConstBuffer &b, int64_t timestamp);
     void setSps(common::DataConstBuffer &b);
-    void takeStats(uint32_t& rendered, int& maxQueued);
+    void takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs);
 
     ~JOMXVideoCodec();
 protected:

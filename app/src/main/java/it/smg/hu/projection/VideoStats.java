@@ -18,7 +18,8 @@ public class VideoStats {
 
     /** Implemented by the video output that owns the decoder. */
     public interface DecoderStats {
-        /** {frames rendered, peak frames waiting for the decoder} since the previous call, or null. */
+        /** {frames rendered, peak frames waiting for the decoder, arrival-to-screen avg ms, max ms}
+         *  since the previous call, or null. */
         int[] takeDecoderStats();
     }
 
@@ -31,9 +32,11 @@ public class VideoStats {
         public final int frameRateLimit;
         public final int renderedFrames; // -1 when no decoder reports
         public final int maxQueued;      // -1 when no decoder reports
+        public final int latencyAvgMs;   // -1 when no decoder reports
+        public final int latencyMaxMs;   // -1 when no decoder reports
 
         private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs, int maxUnackedFrames,
-                         int frameRateLimit, int renderedFrames, int maxQueued){
+                         int frameRateLimit, int renderedFrames, int maxQueued, int latencyAvgMs, int latencyMaxMs){
             this.frames = frames;
             this.bytes = bytes;
             this.maxFrameBytes = maxFrameBytes;
@@ -42,6 +45,8 @@ public class VideoStats {
             this.frameRateLimit = frameRateLimit;
             this.renderedFrames = renderedFrames;
             this.maxQueued = maxQueued;
+            this.latencyAvgMs = latencyAvgMs;
+            this.latencyMaxMs = latencyMaxMs;
         }
     }
 
@@ -67,7 +72,12 @@ public class VideoStats {
         decoderStats_ = decoderStats;
     }
 
-    public synchronized void onFrame(int size){
+    public void onFrame(int size){
+        InputStats.instance().onVideoFrame();
+        countFrame(size);
+    }
+
+    private synchronized void countFrame(int size){
         long now = SystemClock.elapsedRealtime();
         if (lastFrameMs_ != 0){
             maxGapMs_ = Math.max(maxGapMs_, now - lastFrameMs_);
@@ -89,7 +99,8 @@ public class VideoStats {
 
         synchronized (this) {
             Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_, maxUnackedFrames_, frameRateLimit_,
-                    decoder != null ? decoder[0] : -1, decoder != null ? decoder[1] : -1);
+                    decoder != null ? decoder[0] : -1, decoder != null ? decoder[1] : -1,
+                    decoder != null ? decoder[2] : -1, decoder != null ? decoder[3] : -1);
             frames_ = 0;
             bytes_ = 0;
             maxFrameBytes_ = 0;

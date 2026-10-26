@@ -67,6 +67,14 @@ def summarize(path):
         if queued:
             print(f"     frames waiting for decoder  avg peak {sum(queued) / len(queued):4.1f}   max {max(queued):4d}")
 
+        lat_avg = [float(r["video_latency_avg_ms"]) for r in vrows if r.get("video_latency_avg_ms")]
+        lat_max = [float(r["video_latency_max_ms"]) for r in vrows if r.get("video_latency_max_ms")]
+        if lat_avg:
+            print(f"     arrival->screen (ms) avg {sum(lat_avg) / len(lat_avg):6.1f}   max {max(lat_max):6.0f}")
+
+    summarize_touch(rows)
+    summarize_system(rows)
+
     # busiest threads: average CPU % over all samples, by thread name
     totals = defaultdict(float)
     for r in rows:
@@ -78,6 +86,74 @@ def summarize(path):
         for name, total in sorted(totals.items(), key=lambda t: -t[1])[:10]:
             print(f"     {name:30} {total / len(rows):6.1f}")
     print()
+
+
+def floats(rows, key):
+    return [float(r[key]) for r in rows if r.get(key) not in (None, "")]
+
+
+def summarize_touch(rows):
+    touch_rows = [r for r in rows if r.get("touch_events") and int(r["touch_events"]) > 0]
+    if not touch_rows:
+        return
+    events = sum(int(r["touch_events"]) for r in touch_rows)
+    moves = sum(int(r["touch_moves"]) for r in touch_rows)
+    history = sum(int(r["touch_history"]) for r in touch_rows)
+    move_rows = [r for r in touch_rows if int(r["touch_moves"]) > 0]
+    print(f"   touch ({len(touch_rows)} samples with touches, {len(move_rows)} with movement):")
+    if move_rows:
+        rate = [int(r["touch_moves"]) / 5.0 for r in move_rows]
+        print(f"     move events/s        avg {sum(rate) / len(rate):6.1f}   max {max(rate):6.1f}")
+    print(f"     events {events}, moves {moves}, extra samples batched in events {history}")
+    age_max = floats(touch_rows, "touch_age_max_ms")
+    age_avg = floats(touch_rows, "touch_age_avg_ms")
+    print(f"     event age at app (ms) avg {sum(age_avg) / len(age_avg):6.1f}   max {max(age_max):6.0f}")
+    print(f"     app hand-off (ms)                 max {max(floats(touch_rows, 'touch_handoff_max_ms')):6.1f}")
+    send_avg = floats(touch_rows, "touch_send_avg_ms")
+    if send_avg:
+        print(f"     sent to phone (ms)    avg {sum(send_avg) / len(send_avg):6.1f}   max {max(floats(touch_rows, 'touch_send_max_ms')):6.1f}")
+    n = [int(r["touch_to_frame_n"]) for r in touch_rows if r.get("touch_to_frame_n")]
+    if sum(n):
+        weighted = sum(int(r["touch_to_frame_n"]) * float(r["touch_to_frame_avg_ms"]) for r in touch_rows if r.get("touch_to_frame_n"))
+        print(f"     response: touch on still screen -> first frame (ms) avg {weighted / sum(n):6.1f}   max {max(floats(touch_rows, 'touch_to_frame_max_ms')):6.0f}   ({sum(n)} touches)")
+    no_response = sum(int(r["touch_no_response"]) for r in rows if r.get("touch_no_response"))
+    print(f"     touches on a still screen without a new frame within 1 s: {no_response}")
+
+
+def summarize_system(rows):
+    pings = [r for r in rows if r.get("ping_n") and int(r["ping_n"]) > 0]
+    if pings:
+        avg = floats(pings, "ping_avg_ms")
+        print(f"   ping to phone (ms)     avg {sum(avg) / len(avg):6.1f}   max {max(floats(pings, 'ping_max_ms')):6.1f}")
+    lag = sorted(floats(rows, "main_lag_max_ms"))
+    if lag:
+        print(f"   app main thread stall (ms, per sample max) median {lag[len(lag) // 2]:5.0f}   max {lag[-1]:5.0f}")
+    online = defaultdict(int)
+    for r in rows:
+        if r.get("cpu_online"):
+            online[r["cpu_online"]] += 1
+    if online:
+        print("   cpu cores online: " + ", ".join(f"{k} ({v} samples)" for k, v in sorted(online.items())))
+    mhz = defaultdict(list)
+    for r in rows:
+        for i, v in enumerate((r.get("cpu_mhz") or "").split("/")):
+            if v.isdigit():
+                mhz[i].append(int(v))
+    if mhz:
+        print("   cpu MHz per core (min/avg/max): " + ", ".join(
+            f"cpu{i} {min(v)}/{sum(v) // len(v)}/{max(v)}" for i, v in sorted(mhz.items())))
+    dropped = sum(float(r["audio_dropped_kb"]) for r in rows if r.get("audio_dropped_kb"))
+    if any(r.get("audio_dropped_kb") for r in rows):
+        print(f"   audio dropped (playback behind): {dropped:.0f} KB")
+    totals = defaultdict(float)
+    for r in rows:
+        for entry in filter(None, (r.get("top_processes") or "").split("|")):
+            name, _, pct = entry.rpartition(":")
+            totals[name] += float(pct)
+    if totals:
+        print("   busiest processes (avg CPU % of one core):")
+        for name, total in sorted(totals.items(), key=lambda t: -t[1])[:8]:
+            print(f"     {name:30} {total / len(rows):6.1f}")
 
 
 if __name__ == "__main__":

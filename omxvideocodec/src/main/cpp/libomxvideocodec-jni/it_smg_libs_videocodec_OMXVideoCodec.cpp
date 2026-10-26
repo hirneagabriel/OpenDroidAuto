@@ -37,8 +37,8 @@ void JOMXVideoCodec::setSps(common::DataConstBuffer &b){
     omxVideoCodec_->setSps(b);
 }
 
-void JOMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued) {
-    omxVideoCodec_->takeStats(rendered, maxQueued);
+void JOMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs) {
+    omxVideoCodec_->takeStats(rendered, maxQueued, latencyAvgUs, latencyMaxUs);
 }
 
 JOMXVideoCodec::~JOMXVideoCodec() {
@@ -124,10 +124,12 @@ Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeTakeStats(JNIEnv *env, jobjec
 
     uint32_t rendered = 0;
     int maxQueued = 0;
-    jOMXVideoCodec->takeStats(rendered, maxQueued);
+    int64_t latencyAvgUs = 0;
+    int64_t latencyMaxUs = 0;
+    jOMXVideoCodec->takeStats(rendered, maxQueued, latencyAvgUs, latencyMaxUs);
 
-    jint values[2] = {(jint) rendered, (jint) maxQueued};
-    jintArray result = env->NewIntArray(2);
-    env->SetIntArrayRegion(result, 0, 2, values);
+    jint values[4] = {(jint) rendered, (jint) maxQueued, (jint) (latencyAvgUs / 1000), (jint) (latencyMaxUs / 1000)};
+    jintArray result = env->NewIntArray(4);
+    env->SetIntArrayRegion(result, 0, 4, values);
     return result;
 }

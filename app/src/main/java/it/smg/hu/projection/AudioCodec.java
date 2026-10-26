@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import it.smg.libs.common.Log;
 
@@ -20,6 +21,9 @@ public class AudioCodec implements IAudioCodec, Runnable {
     private static final long POLL_TIMEOUT_MS = 100;
     // queued audio beyond this is dropped (oldest first) so latency can't grow without bound
     private static final int MAX_QUEUED_MS = 1000;
+
+    // bytes dropped by all streams because playback fell behind, for ResourceMonitor
+    public static final AtomicLong droppedBytes = new AtomicLong();
 
     private final String name_;
     private AudioTrack audioTrack_;
@@ -92,6 +96,7 @@ public class AudioCodec implements IAudioCodec, Runnable {
                 break;
             }
             queuedBytes_.addAndGet(-dropped.length);
+            droppedBytes.addAndGet(dropped.length);
             if (Log.isDebug()) Log.d(TAG + "_" + name_, "audio queue full, dropped " + dropped.length + " bytes");
         }
     }

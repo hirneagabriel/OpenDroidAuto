@@ -1,3 +1,4 @@
+#include <chrono>
 #include "OMXSource.h"
 #include "Log.h"
 
@@ -37,6 +38,36 @@ OMXSource::~OMXSource() {
     if (Log::isDebug()) Log_d("destructor");
 }
 
+static int64_t steadyNowUs(){
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+void OMXSource::onRendered(int64_t timeUs){
+    std::unique_lock<std::mutex> l(mutex_);
+    auto it = arrivalUs_.find(timeUs);
+    if (it == arrivalUs_.end()) {
+        return;
+    }
+    const int64_t latencyUs = steadyNowUs() - it->second;
+    latencyCount_++;
+    latencySumUs_ += latencyUs;
+    if (latencyUs > latencyMaxUs_) {
+        latencyMaxUs_ = latencyUs;
+    }
+    // frames come out in order: anything older was dropped by the decoder
+    arrivalUs_.erase(arrivalUs_.begin(), ++it);
+}
+
+void OMXSource::takeLatency(int64_t out[3]){
+    std::unique_lock<std::mutex> l(mutex_);
+    out[0] = latencyCount_;
+    out[1] = latencyCount_ > 0 ? latencySumUs_ / latencyCount_ : 0;
+    out[2] = latencyMaxUs_;
+    latencyCount_ = 0;
+    latencySumUs_ = 0;
+    latencyMaxUs_ = 0;
+}
+
 int OMXSource::takeMaxQueued(){
     std::unique_lock<std::mutex> l(mutex_);
     int max = maxQueued_;
@@ -50,6 +81,13 @@ void OMXSource::queueBuffer(MediaBuffer* buffer){
 
     if (!quitFlag_) {
         pbuffers_.push(buffer);
+        int64_t timeUs;
+        if (buffer->meta_data()->findInt64(kKeyTime, &timeUs)) {
+            arrivalUs_[timeUs] = steadyNowUs();
+            while (arrivalUs_.size() > 120) { // frames the decoder never output
+                arrivalUs_.erase(arrivalUs_.begin());
+            }
+        }
         if ((int) pbuffers_.size() > maxQueued_) {
             maxQueued_ = (int) pbuffers_.size();
         }

@@ -1,3 +1,4 @@
+#include "service/LinkStats.h"
 #include <Log.h>
 #include "proto/InputEventIndicationMessage.pb.h"
 #include "service/InputService.h"
@@ -189,10 +190,15 @@ void InputService::onTouchEvent(aasdk::proto::messages::InputEventIndication inp
 {
     if(!isRunning_) return;
 
-    strand_->dispatch([this, self = this->shared_from_this(), inputEventIndication = std::move(inputEventIndication)]() {
+    const auto queuedAt = std::chrono::steady_clock::now();
+    strand_->dispatch([this, self = this->shared_from_this(), inputEventIndication = std::move(inputEventIndication), queuedAt]() {
 
         auto promise = aasdk::channel::SendPromise::defer(strand_, "InputService_touchEvent");
-        promise->then([]() {}, std::bind(&InputService::onChannelError, this->shared_from_this(), std::placeholders::_1));
+        // resolved once written to the transport: time spent queued, encrypted and sent
+        promise->then([queuedAt]() {
+                          linkstats::recordTouchSent(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - queuedAt).count());
+                      },
+                      std::bind(&InputService::onChannelError, this->shared_from_this(), std::placeholders::_1));
         channel_->sendInputEventIndication(inputEventIndication, std::move(promise));
     });
 }

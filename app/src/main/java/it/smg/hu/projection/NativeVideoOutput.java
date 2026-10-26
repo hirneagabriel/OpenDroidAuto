@@ -3,6 +3,7 @@ package it.smg.hu.projection;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.os.Build;
+import android.os.SystemClock;
 import android.view.Surface;
 import android.view.SurfaceView;
 
@@ -11,6 +12,8 @@ import androidx.annotation.RequiresApi;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import it.smg.libs.common.Log;
@@ -34,6 +37,11 @@ public class NativeVideoOutput extends VideoOutput implements Runnable, VideoSta
     private final AtomicInteger rendered_ = new AtomicInteger();
     private final AtomicInteger renderedSinceStats_ = new AtomicInteger();
     private final AtomicInteger maxBacklog_ = new AtomicInteger();
+    // arrival-to-screen: frame timestamp -> arrival time, and totals since the last stats call
+    private final Map<Long, Long> arrivalMs_ = new HashMap<>();
+    private long latencySumMs_;
+    private int latencyCount_;
+    private long latencyMaxMs_;
 
     public NativeVideoOutput(SurfaceView surfaceView){
         super(surfaceView);
@@ -97,6 +105,12 @@ public class NativeVideoOutput extends VideoOutput implements Runnable, VideoSta
                 if (buffer != null) {
                     buffer.put(buf);
                     buffer.flip();
+                    synchronized (arrivalMs_) {
+                        arrivalMs_.put(timestamp, SystemClock.uptimeMillis());
+                        if (arrivalMs_.size() > 120) { // frames the codec never output
+                            arrivalMs_.clear();
+                        }
+                    }
                     codec_.queueInputBuffer(index, 0, buf.limit(), timestamp, 0);
                     int backlog = written_.incrementAndGet() - rendered_.get();
                     if (backlog > maxBacklog_.get()) {
@@ -130,7 +144,15 @@ public class NativeVideoOutput extends VideoOutput implements Runnable, VideoSta
     @Override
     public int[] takeDecoderStats() {
         int backlog = Math.max(0, written_.get() - rendered_.get());
-        return new int[]{renderedSinceStats_.getAndSet(0), Math.max(maxBacklog_.getAndSet(backlog), backlog)};
+        int latencyAvg, latencyMax;
+        synchronized (arrivalMs_) {
+            latencyAvg = latencyCount_ > 0 ? (int) (latencySumMs_ / latencyCount_) : 0;
+            latencyMax = (int) latencyMaxMs_;
+            latencySumMs_ = 0;
+            latencyCount_ = 0;
+            latencyMaxMs_ = 0;
+        }
+        return new int[]{renderedSinceStats_.getAndSet(0), Math.max(maxBacklog_.getAndSet(backlog), backlog), latencyAvg, latencyMax};
     }
 
     @Override
@@ -153,6 +175,15 @@ public class NativeVideoOutput extends VideoOutput implements Runnable, VideoSta
                     // setting true is telling system to render frame onto Surface
                     codec_.releaseOutputBuffer(index, true);
                     rendered_.incrementAndGet();
+                    synchronized (arrivalMs_) {
+                        Long arrival = arrivalMs_.remove(info.presentationTimeUs);
+                        if (arrival != null) {
+                            long latency = SystemClock.uptimeMillis() - arrival;
+                            latencySumMs_ += latency;
+                            latencyCount_++;
+                            latencyMaxMs_ = Math.max(latencyMaxMs_, latency);
+                        }
+                    }
                     renderedSinceStats_.incrementAndGet();
                 }
             }

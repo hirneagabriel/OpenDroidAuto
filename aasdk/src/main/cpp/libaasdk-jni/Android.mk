@@ -43,6 +43,7 @@ AASDK_SRC_FILES := channel/av/AudioServiceChannel.cpp \
                    service/MediaAudioService.cpp \
                    service/MediaStatusService.cpp \
                    service/NavigationStatusService.cpp \
+                   service/LinkStats.cpp \
                    service/Pinger.cpp \
                    service/SensorService.cpp \
                    service/SpeechAudioService.cpp \

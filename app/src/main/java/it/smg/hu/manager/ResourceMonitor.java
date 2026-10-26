@@ -10,6 +10,7 @@ import android.os.Debug;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
@@ -31,6 +32,8 @@ import java.util.Locale;
 import java.util.Map;
 
 import it.smg.hu.config.Settings;
+import it.smg.hu.projection.AudioCodec;
+import it.smg.hu.projection.InputStats;
 import it.smg.hu.projection.VideoStats;
 import it.smg.libs.common.Log;
 
@@ -48,13 +51,18 @@ public class ResourceMonitor {
 
     private static final long INTERVAL_MS = 5000;
     private static final int TOP_THREADS = 5;
+    private static final int TOP_PROCESSES = 5;
+    private static final long LAG_PROBE_MS = 100;
     private static final int CLK_TCK = 100; // jiffies per second, fixed on Android kernels
 
     private static final String CSV_HEADER = "time,uptime_s,proc_cpu_pct,sys_cpu_pct,java_used_kb,java_max_kb,"
             + "native_alloc_kb,total_pss_kb,dalvik_pss_kb,native_pss_kb,other_pss_kb,sys_avail_kb,sys_low_memory,"
             + "video_fps,video_rendered_fps,video_kb_per_s,video_max_frame_kb,video_max_gap_ms,video_max_queued,"
-            + "video_max_unacked,video_fps_limit,"
-            + "threads,top_threads";
+            + "video_max_unacked,video_fps_limit,video_latency_avg_ms,video_latency_max_ms,"
+            + "touch_events,touch_moves,touch_downs,touch_history,touch_age_avg_ms,touch_age_max_ms,touch_handoff_max_ms,"
+            + "touch_sent,touch_send_avg_ms,touch_send_max_ms,touch_to_frame_n,touch_to_frame_avg_ms,touch_to_frame_max_ms,"
+            + "touch_no_response,ping_n,ping_avg_ms,ping_max_ms,main_lag_max_ms,cpu_online,cpu_mhz,audio_dropped_kb,"
+            + "threads,top_threads,top_processes";
 
     private static ResourceMonitor instance_;
 
@@ -73,6 +81,25 @@ public class ResourceMonitor {
     private long lastSysTotal_;
     private long lastSysIdle_;
     private Map<String, Long> lastThreadJiffies_ = new HashMap<>();
+    private Map<String, Long> lastProcessJiffies_ = new HashMap<>();
+
+    // main thread stalls (touch events are handled there): a probe posted every LAG_PROBE_MS
+    // records how late it runs
+    private final Handler mainHandler_ = new Handler(Looper.getMainLooper());
+    private long lagProbeDueMs_;
+    private volatile long mainLagMaxMs_;
+    private final Runnable lagProbe_ = new Runnable() {
+        @Override
+        public void run() {
+            long now = SystemClock.uptimeMillis();
+            long lag = now - lagProbeDueMs_;
+            if (lag > mainLagMaxMs_){
+                mainLagMaxMs_ = lag;
+            }
+            lagProbeDueMs_ = now + LAG_PROBE_MS;
+            mainHandler_.postAtTime(this, lagProbeDueMs_);
+        }
+    };
 
     private ResourceMonitor(Context ctx){
         ctx_ = ctx;
@@ -160,6 +187,8 @@ public class ResourceMonitor {
         thread_.start();
         handler_ = new Handler(thread_.getLooper());
         handler_.post(sampler_);
+        lagProbeDueMs_ = SystemClock.uptimeMillis() + LAG_PROBE_MS;
+        mainHandler_.postAtTime(lagProbe_, lagProbeDueMs_);
 
         if (Log.isInfo()) Log.i(TAG, "started, writing to " + dir);
     }
@@ -170,6 +199,7 @@ public class ResourceMonitor {
         }
 
         handler_.removeCallbacksAndMessages(null);
+        mainHandler_.removeCallbacks(lagProbe_);
         // quitSafely() is API 18, so close and quit from the sampling thread itself; close this
         // run's writer, not csv_, which a following start() may already have replaced
         final HandlerThread thread = thread_;
@@ -299,9 +329,27 @@ public class ResourceMonitor {
             Map.Entry<String, Long> t = deltas.get(i);
             if (top.length() > 0) top.append('|');
             // key is "tid:name"; report the name only
-            top.append(t.getKey().substring(t.getKey().indexOf(':') + 1)).append(':').append(pct(t.getValue(), elapsedJiffies));
+            top.append(clean(t.getKey().substring(t.getKey().indexOf(':') + 1))).append(':').append(pct(t.getValue(), elapsedJiffies));
         }
         lastThreadJiffies_ = threadJiffies;
+
+        // busiest processes system-wide (others' /proc entries are readable on Android 4.x)
+        Map<String, Long> processJiffies = processJiffies();
+        List<Map.Entry<String, Long>> processDeltas = new ArrayList<>();
+        for (Map.Entry<String, Long> p : processJiffies.entrySet()){
+            Long last = lastProcessJiffies_.get(p.getKey());
+            if (last != null && p.getValue() > last){
+                processDeltas.add(new AbstractMap.SimpleEntry<>(p.getKey(), p.getValue() - last));
+            }
+        }
+        Collections.sort(processDeltas, (a, b) -> b.getValue().compareTo(a.getValue()));
+        StringBuilder topProcesses = new StringBuilder();
+        for (int i = 0; i < Math.min(TOP_PROCESSES, processDeltas.size()); i++){
+            Map.Entry<String, Long> p = processDeltas.get(i);
+            if (topProcesses.length() > 0) topProcesses.append('|');
+            topProcesses.append(clean(p.getKey().substring(p.getKey().indexOf(':') + 1))).append(':').append(pct(p.getValue(), elapsedJiffies));
+        }
+        lastProcessJiffies_ = processJiffies;
         lastWallMs_ = nowMs;
 
         // memory
@@ -324,6 +372,27 @@ public class ResourceMonitor {
                 video.bytes / 1024.0 / elapsedS, video.maxFrameBytes / 1024, video.maxGapMs,
                 video.maxQueued >= 0 ? String.valueOf(video.maxQueued) : "");
 
+        String latencyCols = first || video.latencyAvgMs < 0 ? ",," : video.latencyAvgMs + "," + video.latencyMaxMs + ",";
+
+        InputStats.Snapshot touch = InputStats.instance().snapshot();
+        String touchCols = touch.events + "," + touch.moves + "," + touch.downs + "," + touch.historySamples + ","
+                + touch.ageAvgMs + "," + touch.ageMaxMs + "," + String.format(Locale.US, "%.1f", touch.handOffMaxUs / 1000.0) + ",";
+
+        // touch sending and ping round trips, from the native side
+        String linkCols = ",,,,,,";
+        try {
+            long[] link = it.smg.libs.aasdk.Runtime.takeLinkStats();
+            linkCols = link[3] + "," + String.format(Locale.US, "%.1f,%.1f,", link[4] / 1000.0, link[5] / 1000.0)
+                    + touch.responses + "," + touch.responseAvgMs + "," + touch.responseMaxMs + ","
+                    + touch.noResponse + ","
+                    + link[0] + "," + String.format(Locale.US, "%.1f,%.1f,", link[1] / 1000.0, link[2] / 1000.0);
+        } catch (Throwable e){
+            linkCols = ",,," + touch.responses + "," + touch.responseAvgMs + "," + touch.responseMaxMs + "," + touch.noResponse + ",,,,";
+        }
+
+        long mainLag = mainLagMaxMs_;
+        mainLagMaxMs_ = 0;
+
         csv.println(timeFormat_.format(new Date()) + ","
                 + (nowMs - startUptime_) / 1000 + ","
                 + procCpu + ","
@@ -340,9 +409,59 @@ public class ResourceMonitor {
                 + videoCols
                 + video.maxUnackedFrames + ","
                 + video.frameRateLimit + ","
+                + latencyCols
+                + touchCols
+                + linkCols
+                + mainLag + ","
+                + clean(readFirstLine("/sys/devices/system/cpu/online")) + ","
+                + cpuMhz() + ","
+                + AudioCodec.droppedBytes.getAndSet(0) / 1024 + ","
                 + threadJiffies.size() + ","
-                + top);
+                + top + ","
+                + topProcesses);
         csv.flush();
+    }
+
+    /** Keeps names and values from breaking the CSV. */
+    private static String clean(String s){
+        return s == null ? "" : s.replace(',', ';').replace('|', '/').trim();
+    }
+
+    /** Current clock of each core in MHz, e.g. "900/900/-/-" ("-" = offline). */
+    private static String cpuMhz(){
+        StringBuilder sb = new StringBuilder();
+        int cores = Runtime.getRuntime().availableProcessors();
+        for (int i = 0; i < Math.max(cores, 4); i++){
+            String khz = readFirstLine("/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq");
+            if (khz == null && i >= cores){
+                break;
+            }
+            if (sb.length() > 0) sb.append('/');
+            try {
+                sb.append(khz != null ? String.valueOf(Long.parseLong(khz.trim()) / 1000) : "-");
+            } catch (NumberFormatException e){
+                sb.append('?');
+            }
+        }
+        return sb.toString();
+    }
+
+    /** utime + stime per process, keyed by "pid:name". */
+    private static Map<String, Long> processJiffies(){
+        Map<String, Long> result = new HashMap<>();
+        File[] procs = new File("/proc").listFiles();
+        if (procs == null) return result;
+        for (File proc : procs){
+            String pid = proc.getName();
+            if (pid.isEmpty() || !Character.isDigit(pid.charAt(0))) continue;
+            String stat = readFirstLine(proc.getPath() + "/stat");
+            if (stat == null) continue;
+            try {
+                String name = stat.substring(stat.indexOf('(') + 1, stat.lastIndexOf(')'));
+                result.put(pid + ":" + name, procJiffies(proc.getPath() + "/stat"));
+            } catch (RuntimeException ignored) {}
+        }
+        return result;
     }
 
     private static String pct(long jiffies, double elapsedJiffies){

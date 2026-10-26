@@ -94,6 +94,7 @@ status_t OMXDecoder::read(){
             if (ret == 0) {
                 metaData->setInt32(kKeyRendered, 1);
                 renderedFrames_++;
+                source_->onRendered(timeUs);
             }
         }
     }

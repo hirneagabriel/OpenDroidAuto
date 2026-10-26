@@ -1,3 +1,4 @@
+#include "service/LinkStats.h"
 #include "AndroidAutoEntity.h"
 #include <channel/control/ControlServiceChannel.hpp>
 #include <Log.h>
@@ -227,6 +228,13 @@ void AndroidAutoEntity::onPingRequest(const aasdk::proto::messages::PingRequest&
 void AndroidAutoEntity::onPingResponse(const aasdk::proto::messages::PingResponse& response)
 {
     pinger_->pong();
+
+    // the phone echoes the timestamp of our request (same clock as sendPing)
+    const auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    const int64_t roundTripUs = now - response.timestamp();
+    if (roundTripUs >= 0 && roundTripUs < 60 * 1000000LL) {
+        linkstats::recordPing(roundTripUs);
+    }
 //    controlServiceChannel_->receive(this->shared_from_this());
 }
 

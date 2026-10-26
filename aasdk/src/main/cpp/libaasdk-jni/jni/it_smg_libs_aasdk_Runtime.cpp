@@ -1,3 +1,4 @@
+#include "service/LinkStats.h"
 #include <Log.h>
 #include <google/protobuf/stubs/common.h>
 #include "it_smg_libs_aasdk_Runtime.h"
@@ -158,3 +159,19 @@ Java_it_smg_libs_aasdk_Runtime_nativeStopIOServiceWorker(JNIEnv *env, jobject th
 //Java_it_smg_libs_aasdk_Runtime_nativeCrash(JNIEnv *env, jclass clazz) {
 //    abort();
 //}
+
+
+extern "C"
+JNIEXPORT jlongArray JNICALL
+Java_it_smg_libs_aasdk_Runtime_nativeTakeLinkStats(JNIEnv *env, jclass clazz) {
+    int64_t values[6];
+    service::linkstats::take(values);
+
+    jlong jvalues[6];
+    for (int i = 0; i < 6; i++) {
+        jvalues[i] = (jlong) values[i];
+    }
+    jlongArray result = env->NewLongArray(6);
+    env->SetLongArrayRegion(result, 0, 6, jvalues);
+    return result;
+}
