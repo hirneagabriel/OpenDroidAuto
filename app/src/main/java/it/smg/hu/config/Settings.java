@@ -249,6 +249,7 @@ public class Settings {
         public final static String VIDEO_SHOW_NAVIGATION_NOTIFICATION = "video_show_navigation_notification";
         public final static String VIDEO_SHOW_APP_BADGE = "video_show_app_badge";
         public final static String VIDEO_DECODER_LOW_LATENCY = "video_decoder_low_latency";
+        public final static String VIDEO_DECODER_RELEASE_EARLY = "video_decoder_release_early";
 
         public final static int VIDEO_RESOLUTION_DEFAULT_VALUE = 1; // 480p
         public final static int VIDEO_FPS_DEFAULT_VALUE = 1; // 30 fps
@@ -259,6 +260,8 @@ public class Settings {
         public final static boolean VIDEO_SHOW_NAVIGATION_NOTIFICATION_DEFAULT_VALUE = true;
         public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = false; // the home screen widget covers getting back to Android Auto
         public final static boolean VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE = true;
+        // experimental: decoded frames no longer wait for newer input (OMXSource); off until proven on the car
+        public final static boolean VIDEO_DECODER_RELEASE_EARLY_DEFAULT_VALUE = false;
 
         public int resolution(){
             return SP.getInt(VIDEO_RESOLUTION,VIDEO_RESOLUTION_DEFAULT_VALUE);
@@ -287,6 +290,12 @@ public class Settings {
 
         public boolean decoderLowLatency(){
             return get(VIDEO_DECODER_LOW_LATENCY, VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE);
+        }
+        public boolean decoderReleaseEarly(){
+            return get(VIDEO_DECODER_RELEASE_EARLY, VIDEO_DECODER_RELEASE_EARLY_DEFAULT_VALUE);
+        }
+        public void decoderReleaseEarly(boolean value){
+            set(VIDEO_DECODER_RELEASE_EARLY, value);
         }
         public void decoderLowLatency(boolean value){
             set(VIDEO_DECODER_LOW_LATENCY, value);

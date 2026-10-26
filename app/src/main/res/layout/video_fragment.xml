@@ -73,6 +73,23 @@
                 android:id="@+id/video_decoder_low_latency"
                 style="@style/SettingsSwitch" />
         </LinearLayout>
+        <LinearLayout
+            style="@style/SettingsRow"
+            android:background="@drawable/row_bg"
+            android:clickable="true"
+            android:tag="toggle_row">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_decoder_release_early" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_settings_decoder_release_early_summary" />
+            </LinearLayout>
+            <CheckBox
+                android:id="@+id/video_decoder_release_early"
+                style="@style/SettingsSwitch" />
+        </LinearLayout>
     </LinearLayout>
 
     <TextView

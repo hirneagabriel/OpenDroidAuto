@@ -19,7 +19,8 @@ public class VideoStats {
     /** Implemented by the video output that owns the decoder. */
     public interface DecoderStats {
         /** {frames rendered, peak frames waiting for the decoder, arrival-to-screen avg ms, max ms}
-         *  since the previous call, or null. */
+         *  since the previous call, or null. The OMX decoder adds where frames waited:
+         *  {queue wait avg us, decode avg us, decode max us, hand-off avg us, frames in decoder avg x10, max}. */
         int[] takeDecoderStats();
     }
 
@@ -32,9 +33,11 @@ public class VideoStats {
         public final int maxQueued;      // -1 when no decoder reports
         public final int latencyAvgMs;   // -1 when no decoder reports
         public final int latencyMaxMs;   // -1 when no decoder reports
+        // where the arrival-to-screen time goes (OMX decoder only, else null): see DecoderStats
+        public final int[] stages;
 
         private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs,
-                         int renderedFrames, int maxQueued, int latencyAvgMs, int latencyMaxMs){
+                         int renderedFrames, int maxQueued, int latencyAvgMs, int latencyMaxMs, int[] stages){
             this.frames = frames;
             this.bytes = bytes;
             this.maxFrameBytes = maxFrameBytes;
@@ -43,6 +46,7 @@ public class VideoStats {
             this.maxQueued = maxQueued;
             this.latencyAvgMs = latencyAvgMs;
             this.latencyMaxMs = latencyMaxMs;
+            this.stages = stages;
         }
     }
 
@@ -92,7 +96,8 @@ public class VideoStats {
         synchronized (this) {
             Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_,
                     decoder != null ? decoder[0] : -1, decoder != null ? decoder[1] : -1,
-                    decoder != null ? decoder[2] : -1, decoder != null ? decoder[3] : -1);
+                    decoder != null ? decoder[2] : -1, decoder != null ? decoder[3] : -1,
+                    decoder != null && decoder.length >= 10 ? java.util.Arrays.copyOfRange(decoder, 4, 10) : null);
             frames_ = 0;
             bytes_ = 0;
             maxFrameBytes_ = 0;

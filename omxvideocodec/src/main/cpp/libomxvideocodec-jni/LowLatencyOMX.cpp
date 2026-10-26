@@ -37,9 +37,20 @@ void initParams(T* params) {
 }
 
 status_t LowLatencyOMX::allocateNode(const char* name, const sp<IOMXObserver>& observer, node_id* node) {
-    status_t err = omx_->allocateNode(name, observer, node);
-    if (err == OK && name != nullptr && strcmp(name, "OMX.Nvidia.h264.decode") == 0) {
-        enableLowLatency(*node);
+    bool nvidia = name != nullptr && strcmp(name, "OMX.Nvidia.h264.decode") == 0;
+    sp<IOMXObserver> nodeObserver = observer;
+    if (nvidia && source_ != nullptr) {
+        nodeObserver = new EarlyReleaseObserver(observer, source_);
+    }
+    status_t err = omx_->allocateNode(name, nodeObserver, node);
+    if (err == OK && nvidia) {
+        if (lowLatency_) {
+            enableLowLatency(*node);
+        }
+        if (source_ != nullptr) {
+            source_->setEmptyDoneObserver(observer);
+            if (Log::isInfo()) Log_i("early frame release enabled");
+        }
     }
     return err;
 }

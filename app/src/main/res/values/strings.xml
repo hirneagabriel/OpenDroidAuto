@@ -174,4 +174,8 @@
 
 	<!-- settings pages -->
 
+
+	<!-- settings pages -->
+	<string name="video_settings_decoder_release_early">Show frames as soon as decoded (experimental)</string>
+	<string name="video_settings_decoder_release_early_summary">Stops the car\'s decoder holding back ~7 frames. Takes effect on the next connection; turn off if the picture freezes</string>
 </resources>

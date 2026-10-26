@@ -50,6 +50,7 @@ public class OMXVideoOutput extends VideoOutput implements VideoStats.DecoderSta
         videoCodec_ = new OMXVideoCodec(fps_);
         videoCodec_.setSurface(surfaceView_.getHolder().getSurface(), surfaceView_.getWidth(), surfaceView_.getHeight());
         videoCodec_.setLowLatency(settings_.video.decoderLowLatency());
+        videoCodec_.setReleaseEarly(settings_.video.decoderReleaseEarly());
         videoCodec_.init();
         configured_ = true;
         running_ = true;

@@ -36,26 +36,89 @@ OMXSource::OMXSource(int width, int height, int fps):
 
 OMXSource::~OMXSource() {
     if (Log::isDebug()) Log_d("destructor");
+    if (forwarder_.joinable()) {
+        {
+            std::unique_lock<std::mutex> l(mutex_);
+            quitFlag_ = true;
+            forwardCond_.notify_one();
+        }
+        if (forwarder_.get_id() != std::this_thread::get_id()) {
+            forwarder_.join();
+        } else {
+            forwarder_.detach();
+        }
+    }
 }
 
 static int64_t steadyNowUs(){
     return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-void OMXSource::onRendered(int64_t timeUs){
+void OMXSource::onDecoded(int64_t timeUs){
     std::unique_lock<std::mutex> l(mutex_);
-    auto it = arrivalUs_.find(timeUs);
-    if (it == arrivalUs_.end()) {
+    auto it = frames_.find(timeUs);
+    if (it == frames_.end() || it->second.takenUs == 0) {
         return;
     }
-    const int64_t latencyUs = steadyNowUs() - it->second;
+    // frames come out in order: anything older that hasn't come out was dropped by the decoder
+    frames_.erase(frames_.begin(), it);
+    it = frames_.begin();
+
+    // this frame plus the newer ones the decoder already took but hasn't returned: how many frames it holds
+    int64_t inDecoder = 0;
+    for (const auto& f : frames_) {
+        if (f.second.takenUs != 0 && f.second.decodedUs == 0) inDecoder++;
+    }
+
+    const int64_t nowUs = steadyNowUs();
+    FrameTimes& t = it->second;
+    t.decodedUs = nowUs;
+    const int64_t decodeUs = nowUs - t.takenUs;
+    stageCount_++;
+    queueWaitSumUs_ += t.takenUs - t.arrivalUs;
+    decodeSumUs_ += decodeUs;
+    if (decodeUs > decodeMaxUs_) decodeMaxUs_ = decodeUs;
+    inDecoderSum_ += inDecoder;
+    if (inDecoder > inDecoderMax_) inDecoderMax_ = inDecoder;
+}
+
+void OMXSource::onRendered(int64_t timeUs){
+    std::unique_lock<std::mutex> l(mutex_);
+    auto it = frames_.find(timeUs);
+    if (it == frames_.end()) {
+        return;
+    }
+    const int64_t nowUs = steadyNowUs();
+    const int64_t latencyUs = nowUs - it->second.arrivalUs;
     latencyCount_++;
     latencySumUs_ += latencyUs;
     if (latencyUs > latencyMaxUs_) {
         latencyMaxUs_ = latencyUs;
     }
+    if (it->second.decodedUs != 0) {
+        handoffCount_++;
+        handoffSumUs_ += nowUs - it->second.decodedUs;
+    }
     // frames come out in order: anything older was dropped by the decoder
-    arrivalUs_.erase(arrivalUs_.begin(), ++it);
+    frames_.erase(frames_.begin(), ++it);
+}
+
+void OMXSource::takeStages(int64_t out[]){
+    std::unique_lock<std::mutex> l(mutex_);
+    out[0] = stageCount_ > 0 ? queueWaitSumUs_ / stageCount_ : 0;
+    out[1] = stageCount_ > 0 ? decodeSumUs_ / stageCount_ : 0;
+    out[2] = decodeMaxUs_;
+    out[3] = handoffCount_ > 0 ? handoffSumUs_ / handoffCount_ : 0;
+    out[4] = stageCount_ > 0 ? inDecoderSum_ * 10 / stageCount_ : 0;
+    out[5] = inDecoderMax_;
+    stageCount_ = 0;
+    queueWaitSumUs_ = 0;
+    decodeSumUs_ = 0;
+    decodeMaxUs_ = 0;
+    inDecoderSum_ = 0;
+    inDecoderMax_ = 0;
+    handoffCount_ = 0;
+    handoffSumUs_ = 0;
 }
 
 void OMXSource::takeLatency(int64_t out[3]){
@@ -83,9 +146,9 @@ void OMXSource::queueBuffer(MediaBuffer* buffer){
         pbuffers_.push(buffer);
         int64_t timeUs;
         if (buffer->meta_data()->findInt64(kKeyTime, &timeUs)) {
-            arrivalUs_[timeUs] = steadyNowUs();
-            while (arrivalUs_.size() > 120) { // frames the decoder never output
-                arrivalUs_.erase(arrivalUs_.begin());
+            frames_[timeUs].arrivalUs = steadyNowUs();
+            while (frames_.size() > 120) { // frames the decoder never output
+                frames_.erase(frames_.begin());
             }
         }
         if ((int) pbuffers_.size() > maxQueued_) {
@@ -93,6 +156,9 @@ void OMXSource::queueBuffer(MediaBuffer* buffer){
         }
         if (Log::isVerbose()) Log_v("queueBuffer new size %d", pbuffers_.size());
         cond_.notify_one();
+        if (!parked_.empty()) {
+            forwardCond_.notify_one();
+        }
     }
 }
 
@@ -113,7 +179,16 @@ MediaBuffer* OMXSource::nextBuffer(){
         if (Log::isVerbose()) Log_v("buffer size %d", pbuffers_.size());
         MediaBuffer *buffer = pbuffers_.front();
         pbuffers_.pop();
+        if (claimed_ > 0) {
+            claimed_--;
+        }
         if (Log::isVerbose()) Log_v("found buffer %d", pbuffers_.size());
+        // OMXCodec reads its input as soon as it has a free input buffer: the frame goes into the decoder now
+        int64_t timeUs;
+        if (buffer->meta_data()->findInt64(kKeyTime, &timeUs)) {
+            auto it = frames_.find(timeUs);
+            if (it != frames_.end()) it->second.takenUs = steadyNowUs();
+        }
         return buffer;
     }
 
@@ -163,9 +238,63 @@ status_t OMXSource::stop() {
             buffer->release();
         }
         cond_.notify_one();
+        forwardCond_.notify_one();
+    }
+    l.unlock();
+    // the forwarder releases everything still parked (OMXCodec waits for those buffers when it stops);
+    // OMXCodec calls stop() again later, holding its lock, by when the forwarder is gone
+    if (forwarder_.joinable() && forwarder_.get_id() != std::this_thread::get_id()) {
+        forwarder_.join();
     }
     if (Log::isDebug()) Log_d("stopped");
     return OK;
+}
+
+void OMXSource::setEmptyDoneObserver(const sp<IOMXObserver>& codecObserver){
+    std::unique_lock<std::mutex> l(mutex_);
+    codecObserver_ = codecObserver;
+    if (!forwarder_.joinable()) {
+        forwarder_ = std::thread(&OMXSource::forwardParked, this);
+    }
+}
+
+bool OMXSource::parkEmptyDone(const omx_message& msg){
+    std::unique_lock<std::mutex> l(mutex_);
+    if (quitFlag_) {
+        return false;
+    }
+    if (unclaimedFrames() > 0) {
+        // OMXCodec's read() will find this frame at once: pass the message on now
+        claimed_++;
+        return false;
+    }
+    parked_.push_back(msg);
+    return true;
+}
+
+// own thread: OMXCodec may hold its lock while it waits in read() (its first input buffers), so passing a
+// parked message on from the thread that queues the phone's frames could deadlock
+void OMXSource::forwardParked(){
+    std::unique_lock<std::mutex> l(mutex_);
+    while (true) {
+        forwardCond_.wait(l, [this]() { return quitFlag_ || (!parked_.empty() && unclaimedFrames() > 0); });
+        if (parked_.empty()) {
+            if (quitFlag_) break;
+            continue;
+        }
+        omx_message msg = parked_.front();
+        parked_.pop_front();
+        if (!quitFlag_) {
+            claimed_++;
+        }
+        sp<IOMXObserver> observer = codecObserver_;
+        l.unlock();
+        if (observer != nullptr) {
+            observer->onMessage(msg);
+        }
+        l.lock();
+    }
+    if (Log::isDebug()) Log_d("forwarder ends");
 }
 
 

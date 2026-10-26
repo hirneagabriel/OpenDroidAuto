@@ -1,8 +1,27 @@
 #pragma once
 
 #include <media/IOMX.h>
+#include "OMXSource.h"
 
 using namespace android;
+
+/** The NVIDIA decoder's observer with early release on: parks EMPTY_BUFFER_DONE in the source (see OMXSource). */
+class EarlyReleaseObserver : public BnOMXObserver {
+public:
+    EarlyReleaseObserver(const sp<IOMXObserver>& codecObserver, const sp<OMXSource>& source)
+        : codecObserver_(codecObserver), source_(source) {}
+
+    void onMessage(const omx_message& msg) override {
+        if (msg.type == omx_message::EMPTY_BUFFER_DONE && source_->parkEmptyDone(msg)) {
+            return;
+        }
+        codecObserver_->onMessage(msg);
+    }
+
+private:
+    sp<IOMXObserver> codecObserver_;
+    sp<OMXSource> source_;
+};
 
 /**
  * IOMX that forwards everything to the real one, and right after OMXCodec allocates the NVIDIA H.264
@@ -13,7 +32,9 @@ using namespace android;
  */
 class LowLatencyOMX : public IOMX {
 public:
-    explicit LowLatencyOMX(const sp<IOMX>& omx) : omx_(omx) {}
+    // lowLatency: NVIDIA low-buffer / no-DPB / full-frame mode; source != null: early release (see OMXSource)
+    LowLatencyOMX(const sp<IOMX>& omx, bool lowLatency, const sp<OMXSource>& source)
+        : omx_(omx), lowLatency_(lowLatency), source_(source) {}
 
     bool livesLocally(pid_t pid) override { return omx_->livesLocally(pid); }
     status_t listNodes(List<ComponentInfo>* list) override { return omx_->listNodes(list); }
@@ -76,4 +97,6 @@ private:
     void setNvidiaParameter(node_id node, const char* name, const void* params, size_t size);
 
     sp<IOMX> omx_;
+    bool lowLatency_;
+    sp<OMXSource> source_;
 };

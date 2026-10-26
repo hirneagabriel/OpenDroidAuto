@@ -61,6 +61,7 @@ public class ResourceMonitor {
             + "native_alloc_kb,total_pss_kb,dalvik_pss_kb,native_pss_kb,other_pss_kb,sys_avail_kb,sys_low_memory,"
             + "video_fps,video_rendered_fps,video_kb_per_s,video_max_frame_kb,video_max_gap_ms,video_max_queued,"
             + "video_latency_avg_ms,video_latency_max_ms,"
+            + "video_wait_ms,video_decode_avg_ms,video_decode_max_ms,video_handoff_ms,video_in_decoder_avg,video_in_decoder_max,"
             + "touch_events,touch_moves,touch_downs,touch_history,touch_age_avg_ms,touch_age_max_ms,touch_handoff_max_ms,"
             + "touch_sent,touch_send_avg_ms,touch_send_max_ms,touch_to_frame_n,touch_to_frame_avg_ms,touch_to_frame_max_ms,"
             + "touch_no_response,ping_n,ping_avg_ms,ping_max_ms,main_lag_max_ms,cpu_online,cpu_mhz,audio_dropped_kb,"
@@ -381,6 +382,10 @@ public class ResourceMonitor {
                 video.maxQueued >= 0 ? String.valueOf(video.maxQueued) : "");
 
         String latencyCols = first || video.latencyAvgMs < 0 ? ",," : video.latencyAvgMs + "," + video.latencyMaxMs + ",";
+        // where that time goes: waiting for the decoder, inside it, handing it to the screen; and frames it holds
+        int[] st = video.stages;
+        String stageCols = first || st == null || video.latencyAvgMs < 0 ? ",,,,,," : String.format(Locale.US,
+                "%.1f,%.1f,%.1f,%.1f,%.1f,%d,", st[0] / 1000.0, st[1] / 1000.0, st[2] / 1000.0, st[3] / 1000.0, st[4] / 10.0, st[5]);
 
         InputStats.Snapshot touch = InputStats.instance().snapshot();
         String touchCols = touch.events + "," + touch.moves + "," + touch.downs + "," + touch.historySamples + ","
@@ -416,6 +421,7 @@ public class ResourceMonitor {
                 + sysMem.lowMemory + ","
                 + videoCols
                 + latencyCols
+                + stageCols
                 + touchCols
                 + linkCols
                 + mainLag + ","

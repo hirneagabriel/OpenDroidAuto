@@ -68,6 +68,19 @@ def summarize(path):
         if lat_avg:
             print(f"     arrival->screen (ms) avg {sum(lat_avg) / len(lat_avg):6.1f}   max {max(lat_max):6.0f}")
 
+        # where arrival->screen goes (OMX decoder only): waiting for the decoder, inside it, hand-off to the screen
+        def avg_of(col):
+            vals = [float(r[col]) for r in vrows if r.get(col)]
+            return (sum(vals) / len(vals), max(vals)) if vals else None
+        wait, decode, decode_max, handoff = (avg_of(c) for c in
+            ("video_wait_ms", "video_decode_avg_ms", "video_decode_max_ms", "video_handoff_ms"))
+        in_dec, in_dec_max = avg_of("video_in_decoder_avg"), avg_of("video_in_decoder_max")
+        if decode:
+            print(f"       waiting for decoder (ms)  avg {wait[0]:6.1f}")
+            print(f"       inside decoder (ms)       avg {decode[0]:6.1f}   max {decode_max[1]:6.0f}")
+            print(f"       hand-off to screen (ms)   avg {handoff[0]:6.1f}")
+            print(f"       frames held by decoder    avg {in_dec[0]:6.1f}   max {in_dec_max[1]:6.0f}")
+
     summarize_touch(rows)
     summarize_system(rows)
 

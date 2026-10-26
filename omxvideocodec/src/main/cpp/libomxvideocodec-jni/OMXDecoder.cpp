@@ -30,8 +30,8 @@ status_t OMXDecoder::getStatus() const {
     return status_;
 }
 
-status_t OMXDecoder::init(bool lowLatency){
-    if (Log::isInfo()) Log_i("init decoder, low latency %d", lowLatency);
+status_t OMXDecoder::init(bool lowLatency, bool releaseEarly){
+    if (Log::isInfo()) Log_i("init decoder, low latency %d, early release %d", lowLatency, releaseEarly);
 
     status_ = client_->connect();
     if (Log::isInfo()) Log_i("client connect %d", status_);
@@ -39,8 +39,8 @@ status_t OMXDecoder::init(bool lowLatency){
     if (status_ == OK) {
         uint32_t flags = OMXCodec::kHardwareCodecsOnly;
         sp<IOMX> omx = client_->interface();
-        if (lowLatency) {
-            omx = new LowLatencyOMX(omx);
+        if (lowLatency || releaseEarly) {
+            omx = new LowLatencyOMX(omx, lowLatency, releaseEarly ? sp<OMXSource>(source_) : sp<OMXSource>());
         }
         decoder_ = OMXCodec::Create(omx, source_->getFormat(), false, source_,
                                     nullptr, flags, nativeWindow_);
@@ -92,6 +92,7 @@ status_t OMXDecoder::read(){
             sp<MetaData> metaData = videoBuffer->meta_data();
             int64_t timeUs = 0;
             metaData->findInt64(kKeyTime, &timeUs);
+            source_->onDecoded(timeUs);
             native_window_set_buffers_timestamp(nativeWindow_.get(),
                                                 timeUs); //NATIVE_WINDOW_TIMESTAMP_AUTO
             ret = nativeWindow_->queueBuffer(nativeWindow_.get(),

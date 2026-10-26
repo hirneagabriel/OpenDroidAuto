@@ -16,7 +16,7 @@ public class OMXVideoCodec {
     private native long nativeSetup();
     private native void nativeSurfaceInit(Object surface, int width, int height);
     private native int[] nativeTakeStats();
-    private native boolean nativeDecoderInit(int fps, boolean lowLatency);
+    private native boolean nativeDecoderInit(int fps, boolean lowLatency, boolean releaseEarly);
     private native void nativeDelete();
     private native void nativeConsume(ByteBuffer buf, int len, long t);
     private native void nativeSetSps(ByteBuffer buf, int len);
@@ -29,6 +29,7 @@ public class OMXVideoCodec {
     private int height_;
     private int fps_;
     private boolean lowLatency_;
+    private boolean releaseEarly_;
 
     static {
         System.loadLibrary("c++_shared");
@@ -55,8 +56,16 @@ public class OMXVideoCodec {
         lowLatency_ = lowLatency;
     }
 
+    /**
+     * Experimental: don't let the decoder hold decoded frames until newer input arrives (it holds ~7 otherwise,
+     * so the picture runs 7 frames behind); call before init().
+     */
+    public void setReleaseEarly(boolean releaseEarly){
+        releaseEarly_ = releaseEarly;
+    }
+
     public boolean init() {
-        return nativeDecoderInit(fps_, lowLatency_);
+        return nativeDecoderInit(fps_, lowLatency_, releaseEarly_);
     }
 
     public void shutdown() {

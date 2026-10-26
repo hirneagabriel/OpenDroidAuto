@@ -17,7 +17,7 @@ public:
 
     OMXVideoCodec();
 
-    status_t init(int fps, bool lowLatency);
+    status_t init(int fps, bool lowLatency, bool releaseEarly);
     void shutdown();
     void setNativeWindow(ANativeWindow* nativeWindow, int height, int width);
 
@@ -28,6 +28,8 @@ public:
     void setSps(common::DataConstBuffer &b);
     // since the previous call: frames rendered, peak input queue length, arrival-to-screen avg/max (us)
     void takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs);
+    // where frames waited since the previous call (OMXSource::cStageCount values, see OMXSource::takeStages)
+    void takeStages(int64_t out[]);
 
     ~OMXVideoCodec();
 private:
@@ -47,4 +49,5 @@ private:
     ScreenSize screenSize_;
     int fps_;
     bool lowLatency_ = false;
+    bool releaseEarly_ = false;
 };
