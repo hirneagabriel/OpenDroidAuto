@@ -1,7 +1,10 @@
 package it.smg.hu.manager;
 
 import android.app.ActivityManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Debug;
 import android.os.Environment;
@@ -32,8 +35,9 @@ import it.smg.libs.common.Log;
 
 /**
  * Periodically writes the app's CPU and memory usage to a CSV file, so it can be measured
- * on the head unit (no adb there): files go to <log dir>/stats on the USB stick, or to
- * <external storage>/ODA/stats when the log dir doesn't exist (e.g. on the emulator).
+ * on the head unit (no adb there): files go to <log dir>/stats on the USB stick (the log dir
+ * is created when the stick is mounted), or to <external storage>/ODA/stats without a stick
+ * (e.g. on the emulator). Mounting a stick later switches to it.
  *
  * CPU percentages are relative to one core (a process using two full cores reads 200).
  */
@@ -58,6 +62,7 @@ public class ResourceMonitor {
     private HandlerThread thread_;
     private Handler handler_;
     private PrintWriter csv_;
+    private File outputDir_;
 
     private long startUptime_;
     private long lastWallMs_;
@@ -69,6 +74,35 @@ public class ResourceMonitor {
     private ResourceMonitor(Context ctx){
         ctx_ = ctx;
         activityManager_ = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+
+        IntentFilter mountFilter = new IntentFilter(Intent.ACTION_MEDIA_MOUNTED);
+        mountFilter.addDataScheme("file");
+        ctx.registerReceiver(mountReceiver_, mountFilter);
+    }
+
+    private final BroadcastReceiver mountReceiver_ = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Log.isInfo()) Log.i(TAG, "media mounted: " + intent.getData());
+            switchToLogDir();
+        }
+    };
+
+    /** Restarts on the USB stick if it was mounted after sampling started on the device storage. */
+    private synchronized void switchToLogDir(){
+        if (thread_ == null || isLogDirOutput()){
+            return;
+        }
+        File dir = outputDir();
+        if (dir != null && !dir.equals(outputDir_)){
+            stop();
+            start();
+        }
+    }
+
+    private boolean isLogDirOutput(){
+        File logDir = new File(Settings.instance().advanced.logDir());
+        return outputDir_ != null && logDir.equals(outputDir_.getParentFile());
     }
 
     public static void init(Context ctx){
@@ -108,6 +142,7 @@ public class ResourceMonitor {
             csv_ = new PrintWriter(new FileWriter(new File(dir, "stats_" + stamp + ".csv")));
             csv_.println(CSV_HEADER);
             csv_.flush();
+            outputDir_ = dir;
         } catch (IOException e){
             Log.e(TAG, "error creating stats files in " + dir, e);
             closeCsv();
@@ -132,14 +167,18 @@ public class ResourceMonitor {
         }
 
         handler_.removeCallbacksAndMessages(null);
-        // quitSafely() is API 18, so close and quit from the sampling thread itself
+        // quitSafely() is API 18, so close and quit from the sampling thread itself; close this
+        // run's writer, not csv_, which a following start() may already have replaced
         final HandlerThread thread = thread_;
+        final PrintWriter csv = csv_;
         handler_.post(() -> {
-            closeCsv();
+            csv.close();
             thread.quit();
         });
         thread_ = null;
         handler_ = null;
+        csv_ = null;
+        outputDir_ = null;
 
         if (Log.isInfo()) Log.i(TAG, "stopped");
     }
@@ -152,14 +191,51 @@ public class ResourceMonitor {
     }
 
     private File outputDir(){
-        // the log dir is on the USB stick; without it fall back to the device storage
+        // the log dir is on the USB stick; create it only when the stick is really mounted
+        // (the empty mount point exists without one), otherwise use the device storage
         File logDir = new File(Settings.instance().advanced.logDir());
-        File baseDir = logDir.isDirectory() ? logDir : new File(Environment.getExternalStorageDirectory(), "ODA");
-        File statsDir = new File(baseDir, "stats");
-        if ((statsDir.isDirectory() || statsDir.mkdirs()) && statsDir.canWrite()){
-            return statsDir;
+        File stats = writableDir(new File(logDir, "stats"), logDir.isDirectory() || isMountPoint(logDir.getParentFile()));
+        if (stats == null){
+            if (Log.isWarn()) Log.w(TAG, "log dir " + logDir + " not available (USB stick not mounted?), using device storage");
+            stats = writableDir(new File(new File(Environment.getExternalStorageDirectory(), "ODA"), "stats"), true);
+        }
+        return stats;
+    }
+
+    private static File writableDir(File dir, boolean allowCreate){
+        if ((dir.isDirectory() || (allowCreate && dir.mkdirs())) && dir.canWrite()){
+            return dir;
         }
         return null;
+    }
+
+    /** Whether dir is listed in /proc/mounts (directly or through a symlink). */
+    private static boolean isMountPoint(File dir){
+        if (dir == null){
+            return false;
+        }
+        String path;
+        try {
+            path = dir.getCanonicalPath();
+        } catch (IOException e){
+            return false;
+        }
+        BufferedReader in = null;
+        try {
+            in = new BufferedReader(new FileReader("/proc/mounts"));
+            String line;
+            while ((line = in.readLine()) != null){
+                String[] f = line.split(" ");
+                if (f.length > 1 && (f[1].equals(path) || f[1].equals(dir.getPath()))){
+                    return true;
+                }
+            }
+        } catch (IOException e){
+            Log.e(TAG, "error reading /proc/mounts", e);
+        } finally {
+            closeQuietly(in);
+        }
+        return false;
     }
 
     private final Runnable sampler_ = new Runnable() {
@@ -177,7 +253,9 @@ public class ResourceMonitor {
     };
 
     private void sample(){
-        if (csv_ == null){
+        // local copy: stop() may replace csv_ while this run finishes on the sampling thread
+        PrintWriter csv = csv_;
+        if (csv == null){
             return;
         }
 
@@ -234,7 +312,7 @@ public class ResourceMonitor {
         ActivityManager.MemoryInfo sysMem = new ActivityManager.MemoryInfo();
         activityManager_.getMemoryInfo(sysMem);
 
-        csv_.println(timeFormat_.format(new Date()) + ","
+        csv.println(timeFormat_.format(new Date()) + ","
                 + (nowMs - startUptime_) / 1000 + ","
                 + procCpu + ","
                 + sysCpu + ","
@@ -249,7 +327,7 @@ public class ResourceMonitor {
                 + sysMem.lowMemory + ","
                 + threadJiffies.size() + ","
                 + top);
-        csv_.flush();
+        csv.flush();
     }
 
     private static String pct(long jiffies, double elapsedJiffies){
