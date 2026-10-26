@@ -71,7 +71,10 @@ void VideoService::onAVChannelSetupRequest(const aasdk::proto::messages::AVChann
 
     aasdk::proto::messages::AVChannelSetupResponse response;
     response.set_media_status(status);
-    response.set_max_unacked(1);
+    // frames the phone may send before waiting for our ack; 1 makes every frame wait a full round trip
+    const uint32_t maxUnacked = videoOutput_->getMaxUnackedFrames();
+    if(Log::isInfo()) Log_i("max unacked video frames: %u", maxUnacked);
+    response.set_max_unacked(maxUnacked);
     response.add_configs(0);
 
     auto promise = aasdk::channel::SendPromise::defer(strand_, "VideoService_sendVideoFocus");

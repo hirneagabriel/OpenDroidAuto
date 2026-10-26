@@ -24,6 +24,7 @@ public:
     aasdk::proto::enums::VideoResolution::Enum getVideoResolution() override;
     size_t getScreenDPI() override;
     Rect getVideoMargins() override;
+    uint32_t getMaxUnackedFrames() override;
 
     ~JVideoOutput();
 private:
@@ -35,6 +36,7 @@ private:
     jmethodID getVideoResolutionMethodId_;
     jmethodID getScreenDPIMethodId_;
     jmethodID getVideoMarginsMethodId_;
+    jmethodID getMaxUnackedFramesMethodId_;
 
     jclass byteBufferCls_;
     jmethodID bbOrderID_;

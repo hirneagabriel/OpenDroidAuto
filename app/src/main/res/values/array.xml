@@ -24,6 +24,20 @@
         <item>2</item>
     </integer-array>
 
+    <string-array name="video_max_unacked_labels">
+        <item>1 (default)</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+
+    <integer-array name="video_max_unacked_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </integer-array>
+
     <string-array name="video_nightmode">
         <item>TIME/GPS</item>
         <item>LIGHT</item>

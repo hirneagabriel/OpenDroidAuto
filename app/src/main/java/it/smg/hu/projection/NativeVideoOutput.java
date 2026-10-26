@@ -75,6 +75,7 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
     @Keep
     @Override
     public void write(long timestamp, ByteBuffer buf) {
+        VideoStats.instance().onFrame(buf.limit());
         if (configured_ && running_) {
             int index = codec_.dequeueInputBuffer(3000000);
             if (index >= 0) {

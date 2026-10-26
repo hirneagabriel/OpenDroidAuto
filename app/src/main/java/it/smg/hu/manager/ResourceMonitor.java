@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import it.smg.hu.config.Settings;
+import it.smg.hu.projection.VideoStats;
 import it.smg.libs.common.Log;
 
 /**
@@ -51,6 +52,7 @@ public class ResourceMonitor {
 
     private static final String CSV_HEADER = "time,uptime_s,proc_cpu_pct,sys_cpu_pct,java_used_kb,java_max_kb,"
             + "native_alloc_kb,total_pss_kb,dalvik_pss_kb,native_pss_kb,other_pss_kb,sys_avail_kb,sys_low_memory,"
+            + "video_fps,video_kb_per_s,video_max_frame_kb,video_max_gap_ms,video_max_unacked,"
             + "threads,top_threads";
 
     private static ResourceMonitor instance_;
@@ -262,6 +264,7 @@ public class ResourceMonitor {
         long nowMs = SystemClock.elapsedRealtime();
         double elapsedJiffies = (nowMs - lastWallMs_) * CLK_TCK / 1000.0;
         boolean first = lastWallMs_ == 0;
+        double elapsedS = (nowMs - lastWallMs_) / 1000.0;
 
         // process CPU
         long procJiffies = procJiffies("/proc/self/stat");
@@ -312,6 +315,11 @@ public class ResourceMonitor {
         ActivityManager.MemoryInfo sysMem = new ActivityManager.MemoryInfo();
         activityManager_.getMemoryInfo(sysMem);
 
+        // video frames received since the previous sample
+        VideoStats.Snapshot video = VideoStats.instance().snapshot();
+        String videoCols = first ? ",,,," : String.format(Locale.US, "%.1f,%.1f,%d,%d,",
+                video.frames / elapsedS, video.bytes / 1024.0 / elapsedS, video.maxFrameBytes / 1024, video.maxGapMs);
+
         csv.println(timeFormat_.format(new Date()) + ","
                 + (nowMs - startUptime_) / 1000 + ","
                 + procCpu + ","
@@ -325,6 +333,8 @@ public class ResourceMonitor {
                 + mi.otherPss + ","
                 + sysMem.availMem / 1024 + ","
                 + sysMem.lowMemory + ","
+                + videoCols
+                + video.maxUnackedFrames + ","
                 + threadJiffies.size() + ","
                 + top);
         csv.flush();

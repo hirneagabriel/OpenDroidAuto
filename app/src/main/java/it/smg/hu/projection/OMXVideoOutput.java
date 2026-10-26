@@ -58,6 +58,7 @@ public class OMXVideoOutput extends VideoOutput /*implements Runnable*/ {
     @Keep
     @Override
     public void write(long timestamp, ByteBuffer data) {
+        VideoStats.instance().onFrame(data.limit());
         if (configured_ && running_) {
             if (Log.isVerbose()) Log.v(TAG, "video message size: " + data.limit());
             videoCodec_.mediaDecode(timestamp, data, data.limit());

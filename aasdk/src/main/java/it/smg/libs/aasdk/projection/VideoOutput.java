@@ -8,6 +8,7 @@ public abstract class VideoOutput implements IVideoOutput {
     protected int resolution_;
     protected int dpi_;
     protected Rect margin_;
+    protected int maxUnackedFrames_ = 1;
 
     public VideoOutput(){
         handle_ = nativeSetup();
@@ -35,6 +36,12 @@ public abstract class VideoOutput implements IVideoOutput {
     @Override
     public Rect getVideoMargins() {
         return margin_;
+    }
+
+    @Keep
+    @Override
+    public int getMaxUnackedFrames() {
+        return maxUnackedFrames_;
     }
 
     @Override

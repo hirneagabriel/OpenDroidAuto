@@ -30,6 +30,7 @@ public:
     virtual aasdk::proto::enums::VideoResolution::Enum getVideoResolution() = 0;
     virtual size_t getScreenDPI() = 0;
     virtual Rect getVideoMargins() = 0;
+    virtual uint32_t getMaxUnackedFrames() = 0;
 };
 
 }
