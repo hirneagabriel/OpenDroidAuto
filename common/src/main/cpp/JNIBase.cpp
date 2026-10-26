@@ -1,6 +1,7 @@
 #include "JNIBase.h"
 #include "Log.h"
 #include <android_runtime/AndroidRuntime.h>
+#include <sys/prctl.h>
 #include <thread>
 #include <sstream>
 #include <utility>
@@ -38,6 +39,9 @@ int JNIBase::javaAttachThread(const char* threadName, JNIEnv** pEnv)
         if (Log::isWarn()) Log_w("NOTE: attach of thread '%s' failed", threadName);
     } else {
         if(Log::isInfo()) Log_i("attached thread '%s'", threadName);
+        // Dalvik (Android 4.0) doesn't pass the attach name to the kernel, so /proc and
+        // ResourceMonitor would show "Thread-NNN"; set it (truncated to 15 chars) ourselves
+        prctl(PR_SET_NAME, threadName, 0, 0, 0);
     }
 
     return result;
