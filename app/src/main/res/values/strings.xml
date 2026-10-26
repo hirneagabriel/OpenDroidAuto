@@ -34,7 +34,7 @@
 	<string name="samplesize_settings">Sample Size</string>
 	<string name="channelcount_settings">Channel Count</string>
 	<string name="input_audio_settings">Microphone Settings</string>
-	<string name="input_settings_mic_source">Source Type</string>
+	<string name="input_settings_mic_source">Microphone source</string>
 
 	<string name="conn_settings">Connectivity Settings</string>
 	<string name="conn_settings_enableAd2p">Bluetooth audio (A2DP)</string>
@@ -178,4 +178,7 @@
 	<!-- settings pages -->
 	<string name="video_settings_decoder_release_early">Show frames as soon as decoded (experimental)</string>
 	<string name="video_settings_decoder_release_early_summary">Stops the car\'s decoder holding back ~7 frames. Takes effect on the next connection; turn off if the picture freezes</string>
+
+	<!-- settings pages -->
+	<string name="input_settings_mic_source_summary">Try another if the voice assistant can\'t hear you. Takes effect on the next voice command</string>
 </resources>

@@ -56,6 +56,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/advanced_settings_enablehondamicvr" />
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/input_settings_mic_source" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/input_settings_mic_source_summary" />
+            </LinearLayout>
+            <Spinner
+                android:id="@+id/mic_source"
+                style="@style/SettingsChoice" />
+        </LinearLayout>
     </LinearLayout>
 
     <TextView

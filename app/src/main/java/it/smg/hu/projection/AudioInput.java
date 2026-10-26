@@ -118,6 +118,8 @@ public class AudioInput extends it.smg.libs.aasdk.projection.AudioInput {
         }
 
         isActive_ = true;
+        // read on each start so a source picked in Settings applies on the next voice command
+        sourceType_ = settings_.audio.micSource();
 
         if (settings_.advanced.hondaIntegrationEnabled()) {
             hondaConnectManager_.startMicSession();
