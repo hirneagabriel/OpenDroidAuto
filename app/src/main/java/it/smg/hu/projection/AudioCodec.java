@@ -5,14 +5,21 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 
 import java.nio.ByteBuffer;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import it.smg.libs.common.Log;
 
 public class AudioCodec implements IAudioCodec, Runnable {
     private static final String TAG = "AudioCodec";
+
+    // how long the playback thread waits for data before rechecking running_
+    private static final long POLL_TIMEOUT_MS = 100;
+    // queued audio beyond this is dropped (oldest first) so latency can't grow without bound
+    private static final int MAX_QUEUED_MS = 1000;
 
     private final String name_;
     private AudioTrack audioTrack_;
@@ -22,7 +29,9 @@ public class AudioCodec implements IAudioCodec, Runnable {
     private final int sampleSize_;
     protected AtomicBoolean running_;
 
-    private final Queue<byte[]> queue_;
+    private final BlockingQueue<byte[]> queue_;
+    private final AtomicInteger queuedBytes_;
+    private final int maxQueuedBytes_;
     private Thread codecThread_;
 
     public AudioCodec(String name, int streamType, int sampleRate, int channelConfig, int sampleSize){
@@ -33,7 +42,9 @@ public class AudioCodec implements IAudioCodec, Runnable {
         sampleSize_ = sampleSize;
         running_ = new AtomicBoolean(false);
 
-        queue_ = new ConcurrentLinkedQueue<>();
+        queue_ = new LinkedBlockingQueue<>();
+        queuedBytes_ = new AtomicInteger(0);
+        maxQueuedBytes_ = sampleRate * channelConfig * (sampleSize / 8) * MAX_QUEUED_MS / 1000;
     }
 
     private static int channels2num(int channels){
@@ -72,17 +83,31 @@ public class AudioCodec implements IAudioCodec, Runnable {
         buffer.get(data);
 
         queue_.add(data);
+        queuedBytes_.addAndGet(size);
+
+        // playback can't keep up: drop the oldest audio instead of falling further behind
+        while (queuedBytes_.get() > maxQueuedBytes_) {
+            byte[] dropped = queue_.poll();
+            if (dropped == null) {
+                break;
+            }
+            queuedBytes_.addAndGet(-dropped.length);
+            if (Log.isDebug()) Log.d(TAG + "_" + name_, "audio queue full, dropped " + dropped.length + " bytes");
+        }
     }
 
     @Override
     public void start() {
         if (Log.isInfo()) Log.i(TAG, "Start");
 
+        // set before the thread starts, otherwise it may see false and exit immediately
+        if (!running_.compareAndSet(false, true)) {
+            return;
+        }
+
         codecThread_ = new Thread(this);
         codecThread_.setName(name_);
         codecThread_.start();
-
-        running_.set(true);
     }
 
     @Override
@@ -100,6 +125,7 @@ public class AudioCodec implements IAudioCodec, Runnable {
             }
 
             queue_.clear();
+            queuedBytes_.set(0);
             if (Log.isDebug()) Log.d(TAG, "queue empty");
         }
     }
@@ -117,6 +143,7 @@ public class AudioCodec implements IAudioCodec, Runnable {
                 audioTrack_ = new AudioTrack(streamType_, sampleRate_, channels2num(channelConfig_), sampleSizeFromInt(sampleSize_), bufferSize_ * 3, AudioTrack.MODE_STREAM);
             } catch (Exception e) {
                 Log.e(TAG, "error in audiotrack creation", e);
+                running_.set(false);
                 return;
             }
 
@@ -130,8 +157,15 @@ public class AudioCodec implements IAudioCodec, Runnable {
 
         if (Log.isVerbose()) Log.v(TAG + "_" + codecThread_.getName(), "running thread");
         while (running_.get()) {
-            byte[] data = queue_.poll();
+            byte[] data;
+            try {
+                // block until data arrives instead of spinning on an empty queue
+                data = queue_.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                break;
+            }
             if (data != null){
+                queuedBytes_.addAndGet(-data.length);
                 audioTrack_.write(data, 0, data.length);
             }
         }

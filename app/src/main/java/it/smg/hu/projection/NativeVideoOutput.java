@@ -19,9 +19,13 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
 
     private static final String TAG = "NativeVideoOutput";
 
+    // how long the output thread waits for a decoded frame before rechecking running_
+    private static final long DEQUEUE_TIMEOUT_US = 10000;
+
     private MediaCodec codec_;
-    private boolean configured_;
-    private boolean running_;
+    // shared between the protocol thread (write/stop) and the output thread
+    private volatile boolean configured_;
+    private volatile boolean running_;
     private Thread codecThread_;
 
     public NativeVideoOutput(SurfaceView surfaceView){
@@ -59,8 +63,9 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
             codec_.configure(format, surface, null, 0);
             configured_ = true;
             codec_.start();
-            codecThread_.start();
+            // set before the thread starts, otherwise it may see false and exit immediately
             running_ = true;
+            codecThread_.start();
             return true;
         } catch (IOException e) {
             return false;
@@ -113,7 +118,8 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         while (running_) {
             if (configured_) {
-                int index = codec_.dequeueOutputBuffer(info, 0);
+                // wait for a frame instead of spinning with a zero timeout
+                int index = codec_.dequeueOutputBuffer(info, DEQUEUE_TIMEOUT_US);
                 if (index >= 0) {
                     if (Log.isVerbose()) Log.v(TAG, "outputBufferIndex: " + index);
                     ByteBuffer buffer = null;
