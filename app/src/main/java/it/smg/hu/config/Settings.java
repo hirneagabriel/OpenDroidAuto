@@ -245,8 +245,6 @@ public class Settings {
         public final static String VIDEO_SHOW_MEDIA_NOTIFICATION = "video_show_media_notification";
         public final static String VIDEO_SHOW_NAVIGATION_NOTIFICATION = "video_show_navigation_notification";
         public final static String VIDEO_SHOW_APP_BADGE = "video_show_app_badge";
-        public final static String VIDEO_MAX_UNACKED = "video_max_unacked";
-        public final static String VIDEO_FPS_LIMIT = "video_fps_limit";
         public final static String VIDEO_DECODER_LOW_LATENCY = "video_decoder_low_latency";
 
         public final static int VIDEO_RESOLUTION_DEFAULT_VALUE = 1; // 480p
@@ -257,8 +255,6 @@ public class Settings {
         public final static boolean VIDEO_SHOW_MEDIA_NOTIFICATION_DEFAULT_VALUE = true;
         public final static boolean VIDEO_SHOW_NAVIGATION_NOTIFICATION_DEFAULT_VALUE = true;
         public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = true;
-        public final static int VIDEO_MAX_UNACKED_DEFAULT_VALUE = 1;
-        public final static int VIDEO_FPS_LIMIT_DEFAULT_VALUE = 0; // off
         public final static boolean VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE = true;
 
         public int resolution(){
@@ -286,25 +282,11 @@ public class Settings {
             return get(VIDEO_MARGIN,VIDEO_MARGIN_DEFAULT_VALUE);
         }
 
-        public int maxUnackedFrames(){
-            return get(VIDEO_MAX_UNACKED, VIDEO_MAX_UNACKED_DEFAULT_VALUE);
-        }
-        public void maxUnackedFrames(int value){
-            set(VIDEO_MAX_UNACKED, value);
-        }
-
         public boolean decoderLowLatency(){
             return get(VIDEO_DECODER_LOW_LATENCY, VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE);
         }
         public void decoderLowLatency(boolean value){
             set(VIDEO_DECODER_LOW_LATENCY, value);
-        }
-
-        public int frameRateLimit(){
-            return get(VIDEO_FPS_LIMIT, VIDEO_FPS_LIMIT_DEFAULT_VALUE);
-        }
-        public void frameRateLimit(int value){
-            set(VIDEO_FPS_LIMIT, value);
         }
         public void margin(String value){
             set(VIDEO_MARGIN, value);

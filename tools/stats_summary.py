@@ -44,18 +44,14 @@ def summarize(path):
             continue
         print(f"   {label:40} {sum(values) / len(values):10.1f} {max(values):10.1f} {values[-1]:10.1f}")
 
-    # video, per "frames in flight" setting, over samples where video was arriving
-    groups = defaultdict(list)
-    for r in rows:
-        if r.get("video_fps") and float(r["video_fps"]) > 0:
-            limit = r.get("video_fps_limit") or "0"
-            groups[(r.get("video_max_unacked", "?"), "off" if limit == "0" else limit)].append(r)
-    for (unacked, limit), vrows in sorted(groups.items()):
+    # video, over samples where video was arriving
+    vrows = [r for r in rows if r.get("video_fps") and float(r["video_fps"]) > 0]
+    if vrows:
         fps = [float(r["video_fps"]) for r in vrows]
         kbps = [float(r["video_kb_per_s"]) for r in vrows]
         frame = [float(r["video_max_frame_kb"]) for r in vrows]
         gaps = sorted(float(r["video_max_gap_ms"]) for r in vrows)
-        print(f"   video, {unacked} frame(s) in flight, fps limit {limit} ({len(vrows)} samples with video):")
+        print(f"   video ({len(vrows)} samples with video):")
         print(f"     frames/s             avg {sum(fps) / len(fps):6.1f}   max {max(fps):6.1f}")
         print(f"     KB/s                 avg {sum(kbps) / len(kbps):6.1f}   max {max(kbps):6.1f}")
         print(f"     largest frame (KB)                max {max(frame):6.0f}")

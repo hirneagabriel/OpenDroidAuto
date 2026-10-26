@@ -14,11 +14,6 @@ VideoService::VideoService(aasdk::io::ioService& ioService, aasdk::messenger::IM
         , serviceEventHandler_(serviceEventHandler)
         , session_(-1)
         , isRunning_(false)
-        , ackTimer_(ioService)
-        , ackInterval_(0)
-        , nextAckTime_(std::chrono::steady_clock::now())
-        , pendingAcks_(0)
-        , ackTimerArmed_(false)
 {
 
 }
@@ -45,9 +40,6 @@ void VideoService::stop()
 {
     if(Log::isInfo()) Log_i("Stop");
     isRunning_ = false;
-    strand_->dispatch([this, self = this->shared_from_this()]() {
-        ackTimer_.cancel();
-    });
     videoOutput_->stop();
 }
 
@@ -79,17 +71,7 @@ void VideoService::onAVChannelSetupRequest(const aasdk::proto::messages::AVChann
 
     aasdk::proto::messages::AVChannelSetupResponse response;
     response.set_media_status(status);
-    // frames the phone may send before waiting for our ack; 1 makes every frame wait a full round trip
-    const uint32_t maxUnacked = videoOutput_->getMaxUnackedFrames();
-    if(Log::isInfo()) Log_i("max unacked video frames: %u", maxUnacked);
-    response.set_max_unacked(maxUnacked);
-
-    const uint32_t fpsLimit = videoOutput_->getFrameRateLimit();
-    ackInterval_ = fpsLimit > 0 ? std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::microseconds(1000000 / fpsLimit))
-                                : std::chrono::steady_clock::duration(0);
-    nextAckTime_ = std::chrono::steady_clock::now();
-    pendingAcks_ = 0;
-    if(Log::isInfo()) Log_i("video frame rate limit: %u (0 = off)", fpsLimit);
+    response.set_max_unacked(1);
     response.add_configs(0);
 
     auto promise = aasdk::channel::SendPromise::defer(strand_, "VideoService_sendVideoFocus");
@@ -123,44 +105,6 @@ void VideoService::onAVMediaWithTimestampIndication(aasdk::messenger::Timestamp:
 {
     videoOutput_->write(timestamp, buffer);
 
-    pendingAcks_++;
-    sendPendingAcks();
-
-//    channel_->receive(this->shared_from_this());
-}
-
-// runs on strand_ (media indications and the ack timer)
-void VideoService::sendPendingAcks()
-{
-    if (ackTimerArmed_) {
-        return;
-    }
-
-    const auto now = std::chrono::steady_clock::now();
-    while (pendingAcks_ > 0 && now >= nextAckTime_) {
-        sendAck();
-        pendingAcks_--;
-        nextAckTime_ = now + ackInterval_;
-    }
-
-    if (pendingAcks_ > 0) {
-        ackTimerArmed_ = true;
-        ackTimer_.expires_at(nextAckTime_);
-        ackTimer_.async_wait(strand_->wrap(std::bind(&VideoService::onAckTimer, this->shared_from_this(), std::placeholders::_1)));
-    }
-}
-
-void VideoService::onAckTimer(const boost::system::error_code& error)
-{
-    ackTimerArmed_ = false;
-    if (error == boost::asio::error::operation_aborted || !isRunning_) {
-        return;
-    }
-    sendPendingAcks();
-}
-
-void VideoService::sendAck()
-{
     aasdk::proto::messages::AVMediaAckIndication indication;
     indication.set_session(session_);
     indication.set_value(1);
@@ -168,6 +112,8 @@ void VideoService::sendAck()
     auto promise = aasdk::channel::SendPromise::defer(strand_, "VideoService_avMediaAck");
     promise->then([]() {}, std::bind(&VideoService::onChannelError, this->shared_from_this(), std::placeholders::_1));
     channel_->sendAVMediaAckIndication(indication, std::move(promise));
+
+//    channel_->receive(this->shared_from_this());
 }
 
 void VideoService::onAVMediaIndication(const aasdk::common::DataConstBuffer& buffer)

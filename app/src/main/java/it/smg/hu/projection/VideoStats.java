@@ -28,21 +28,17 @@ public class VideoStats {
         public final long bytes;
         public final int maxFrameBytes;
         public final long maxGapMs;
-        public final int maxUnackedFrames;
-        public final int frameRateLimit;
         public final int renderedFrames; // -1 when no decoder reports
         public final int maxQueued;      // -1 when no decoder reports
         public final int latencyAvgMs;   // -1 when no decoder reports
         public final int latencyMaxMs;   // -1 when no decoder reports
 
-        private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs, int maxUnackedFrames,
-                         int frameRateLimit, int renderedFrames, int maxQueued, int latencyAvgMs, int latencyMaxMs){
+        private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs,
+                         int renderedFrames, int maxQueued, int latencyAvgMs, int latencyMaxMs){
             this.frames = frames;
             this.bytes = bytes;
             this.maxFrameBytes = maxFrameBytes;
             this.maxGapMs = maxGapMs;
-            this.maxUnackedFrames = maxUnackedFrames;
-            this.frameRateLimit = frameRateLimit;
             this.renderedFrames = renderedFrames;
             this.maxQueued = maxQueued;
             this.latencyAvgMs = latencyAvgMs;
@@ -51,8 +47,6 @@ public class VideoStats {
     }
 
     private DecoderStats decoderStats_;
-    private int maxUnackedFrames_;
-    private int frameRateLimit_;
     private int frames_;
     private long bytes_;
     private int maxFrameBytes_;
@@ -62,9 +56,7 @@ public class VideoStats {
     private VideoStats(){}
 
     /** Called when a video output is created for a new connection. */
-    public synchronized void newSession(int maxUnackedFrames, int frameRateLimit){
-        maxUnackedFrames_ = maxUnackedFrames;
-        frameRateLimit_ = frameRateLimit;
+    public synchronized void newSession(){
         lastFrameMs_ = 0;
     }
 
@@ -98,7 +90,7 @@ public class VideoStats {
         int[] decoder = decoderStats != null ? decoderStats.takeDecoderStats() : null;
 
         synchronized (this) {
-            Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_, maxUnackedFrames_, frameRateLimit_,
+            Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_,
                     decoder != null ? decoder[0] : -1, decoder != null ? decoder[1] : -1,
                     decoder != null ? decoder[2] : -1, decoder != null ? decoder[3] : -1);
             frames_ = 0;
