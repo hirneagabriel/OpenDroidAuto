@@ -16,7 +16,7 @@ public class OMXVideoCodec {
     private native long nativeSetup();
     private native void nativeSurfaceInit(Object surface, int width, int height);
     private native int[] nativeTakeStats();
-    private native boolean nativeDecoderInit(int fps);
+    private native boolean nativeDecoderInit(int fps, boolean lowLatency);
     private native void nativeDelete();
     private native void nativeConsume(ByteBuffer buf, int len, long t);
     private native void nativeSetSps(ByteBuffer buf, int len);
@@ -28,6 +28,7 @@ public class OMXVideoCodec {
     private int width_;
     private int height_;
     private int fps_;
+    private boolean lowLatency_;
 
     static {
         System.loadLibrary("c++_shared");
@@ -49,8 +50,13 @@ public class OMXVideoCodec {
         nativeSurfaceInit (surface, width_, height_);
     }
 
+    /** Switch the NVIDIA decoder to low-latency mode (frames shown as soon as decoded); call before init(). */
+    public void setLowLatency(boolean lowLatency){
+        lowLatency_ = lowLatency;
+    }
+
     public boolean init() {
-        return nativeDecoderInit(fps_);
+        return nativeDecoderInit(fps_, lowLatency_);
     }
 
     public void shutdown() {

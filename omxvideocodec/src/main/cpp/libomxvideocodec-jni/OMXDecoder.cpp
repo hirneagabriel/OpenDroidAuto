@@ -2,6 +2,7 @@
 #include <Log.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/OMXCodec.h>
+#include "LowLatencyOMX.h"
 
 using namespace android;
 
@@ -29,15 +30,19 @@ status_t OMXDecoder::getStatus() const {
     return status_;
 }
 
-status_t OMXDecoder::init(){
-    if (Log::isInfo()) Log_i("init decoder");
+status_t OMXDecoder::init(bool lowLatency){
+    if (Log::isInfo()) Log_i("init decoder, low latency %d", lowLatency);
 
     status_ = client_->connect();
     if (Log::isInfo()) Log_i("client connect %d", status_);
 
     if (status_ == OK) {
         uint32_t flags = OMXCodec::kHardwareCodecsOnly;
-        decoder_ = OMXCodec::Create(client_->interface(), source_->getFormat(), false, source_,
+        sp<IOMX> omx = client_->interface();
+        if (lowLatency) {
+            omx = new LowLatencyOMX(omx);
+        }
+        decoder_ = OMXCodec::Create(omx, source_->getFormat(), false, source_,
                                     nullptr, flags, nativeWindow_);
         status_ = decoder_->start();
 

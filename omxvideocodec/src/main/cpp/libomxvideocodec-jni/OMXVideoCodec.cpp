@@ -27,8 +27,9 @@ OMXVideoCodec::~OMXVideoCodec() {
     omxSource_ = nullptr;
 }
 
-status_t OMXVideoCodec::init(int fps){
+status_t OMXVideoCodec::init(int fps, bool lowLatency){
     fps_ = fps;
+    lowLatency_ = lowLatency;
     if (Log::isInfo()) Log_i("FPS %d", fps_);
     // Create decoder thread and wait until ready
     if (Log::isInfo()) Log_i("start omxDecoderThread");
@@ -77,7 +78,7 @@ void OMXVideoCodec::init_omxDecoderThread() {
     omxDecoder_ = new OMXDecoder();
     omxDecoder_->setNativeWindow(nativeWindow_);
     omxDecoder_->setSource(omxSource_);
-    omxDecoder_->init();
+    omxDecoder_->init(lowLatency_);
 
     std::unique_lock<std::mutex> codeclock(codecMutex_);
     decoderThreadInitialized_ = true;

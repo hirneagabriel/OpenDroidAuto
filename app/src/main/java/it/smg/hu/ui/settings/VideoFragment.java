@@ -39,6 +39,9 @@ public class VideoFragment extends BaseSettingsFragment {
         Spinner maxUnacked = view.findViewById(R.id.video_max_unacked);
         initSpinner(maxUnacked, R.array.video_max_unacked_labels, R.array.video_max_unacked_values, settings.video, Settings.Video.VIDEO_MAX_UNACKED, Settings.Video.VIDEO_MAX_UNACKED_DEFAULT_VALUE);
 
+        CheckBox decoderLowLatency = view.findViewById(R.id.video_decoder_low_latency);
+        initCheckBox(decoderLowLatency, settings.video, Settings.Video.VIDEO_DECODER_LOW_LATENCY, Settings.Video.VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE);
+
         Spinner fpsLimit = view.findViewById(R.id.video_fps_limit);
         initSpinner(fpsLimit, R.array.video_fps_limit_labels, R.array.video_fps_limit_values, settings.video, Settings.Video.VIDEO_FPS_LIMIT, Settings.Video.VIDEO_FPS_LIMIT_DEFAULT_VALUE);
 

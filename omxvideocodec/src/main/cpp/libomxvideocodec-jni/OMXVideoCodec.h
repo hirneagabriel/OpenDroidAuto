@@ -17,7 +17,7 @@ public:
 
     OMXVideoCodec();
 
-    status_t init(int fps);
+    status_t init(int fps, bool lowLatency);
     void shutdown();
     void setNativeWindow(ANativeWindow* nativeWindow, int height, int width);
 
@@ -46,4 +46,5 @@ private:
     sp<ANativeWindow> nativeWindow_;
     ScreenSize screenSize_;
     int fps_;
+    bool lowLatency_ = false;
 };

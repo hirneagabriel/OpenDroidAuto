@@ -15,7 +15,7 @@ public:
     static JOMXVideoCodec::Pointer getJOMXVideoCodec(JNIEnv* env, jobject jvideocodec);
 
     void setNativeWindow(ANativeWindow* nativeWindow, int height, int width);
-    status_t init(int fps);
+    status_t init(int fps, bool lowLatency);
     void shutdown();
     void queueBuffer(common::DataConstBuffer &b, int64_t timestamp);
     void setSps(common::DataConstBuffer &b);

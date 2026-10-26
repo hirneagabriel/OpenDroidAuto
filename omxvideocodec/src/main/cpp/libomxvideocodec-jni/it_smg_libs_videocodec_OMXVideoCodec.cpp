@@ -20,8 +20,8 @@ void JOMXVideoCodec::setNativeWindow(ANativeWindow* nativeWindow, int height, in
     omxVideoCodec_->setNativeWindow(nativeWindow, height, width);
 }
 
-status_t JOMXVideoCodec::init(int fps){
-    return omxVideoCodec_->init(fps);
+status_t JOMXVideoCodec::init(int fps, bool lowLatency){
+    return omxVideoCodec_->init(fps, lowLatency);
 }
 
 void JOMXVideoCodec::shutdown(){
@@ -76,9 +76,9 @@ Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeSurfaceInit(JNIEnv *env, jobj
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeDecoderInit(JNIEnv *env, jobject thiz, jint fps) {
+Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeDecoderInit(JNIEnv *env, jobject thiz, jint fps, jboolean lowLatency) {
     JOMXVideoCodec::Pointer jOMXVideoCodec = JOMXVideoCodec::getJOMXVideoCodec(env, thiz);
-    status_t ret = jOMXVideoCodec->init(fps);
+    status_t ret = jOMXVideoCodec->init(fps, lowLatency == JNI_TRUE);
 
     return ret == 0 ? JNI_TRUE : JNI_FALSE;
 }

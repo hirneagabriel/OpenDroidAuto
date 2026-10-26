@@ -18,7 +18,8 @@ public:
     virtual status_t read();
     void setNativeWindow(sp<ANativeWindow> &nativeWindow);
     void setSource(OMXSource *source);
-    status_t  init();
+    // lowLatency: switch the NVIDIA decoder to low-buffer / no-DPB mode (see LowLatencyOMX)
+    status_t  init(bool lowLatency);
     int32_t frameRate() const;
     void stop();
     ~OMXDecoder();
