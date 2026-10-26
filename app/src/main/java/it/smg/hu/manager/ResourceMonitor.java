@@ -279,8 +279,11 @@ public class ResourceMonitor {
             } catch (Exception e){
                 Log.e(TAG, "sample error", e);
             }
-            if (handler_ != null){
-                handler_.postDelayed(this, INTERVAL_MS);
+            // only re-post on this sampling thread's own handler: after a restart handler_ belongs
+            // to the new thread, and re-posting there would run two sampling loops into one file
+            Handler handler = handler_;
+            if (handler != null && handler.getLooper() == Looper.myLooper()){
+                handler.postDelayed(this, INTERVAL_MS);
             }
         }
     };
