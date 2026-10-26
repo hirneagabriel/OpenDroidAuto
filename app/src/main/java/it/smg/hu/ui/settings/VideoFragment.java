@@ -36,6 +36,12 @@ public class VideoFragment extends BaseSettingsFragment {
         Spinner fps = view.findViewById(R.id.video_fps);
         initSpinner(fps, R.array.video_fps_labels, R.array.video_fps_values, settings.video, Settings.Video.VIDEO_FPS, Settings.Video.VIDEO_FPS_DEFAULT_VALUE);
 
+        CheckBox decoderLowLatency = view.findViewById(R.id.video_decoder_low_latency);
+        initCheckBox(decoderLowLatency, settings.video, Settings.Video.VIDEO_DECODER_LOW_LATENCY, Settings.Video.VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE);
+
+        CheckBox decoderReleaseEarly = view.findViewById(R.id.video_decoder_release_early);
+        initCheckBox(decoderReleaseEarly, settings.video, Settings.Video.VIDEO_DECODER_RELEASE_EARLY, Settings.Video.VIDEO_DECODER_RELEASE_EARLY_DEFAULT_VALUE);
+
         EditText dpi = view.findViewById(R.id.video_dpi);
         initEditText(dpi, settings.video, Settings.Video.VIDEO_DPI, Settings.Video.VIDEO_DPI_DEFAULT_VALUE);
 

@@ -66,7 +66,7 @@ public class DeviceFactory {
     public static IVideoOutput createVideoOutput(SurfaceView surfaceView){
         if (Log.isInfo()) Log.i(TAG, "create video service");
         IVideoOutput videoOutput;
-        if (DeviceUtils.isX86) {
+        if (DeviceUtils.isX86 && Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
             if (Log.isInfo()) Log.i(TAG, "Fake Video Output");
             videoOutput = new FakeVideoOutput(surfaceView);
         } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN){

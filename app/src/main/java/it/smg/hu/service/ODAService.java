@@ -11,14 +11,19 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import androidx.annotation.Keep;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import it.smg.hu.R;
 import it.smg.hu.config.Settings;
 import it.smg.hu.manager.HondaConnectManager;
 import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 import it.smg.hu.projection.InputDevice;
 import it.smg.hu.ui.notification.NotificationFactory;
+import it.smg.hu.widget.ConnectionWidget;
 import it.smg.libs.aasdk.tcp.TCPConnectException;
 import it.smg.libs.common.Log;
 import it.smg.libs.aasdk.service.AndroidAutoEntity;
@@ -52,7 +57,18 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 
     private Handler mainHandler_;
 
-    private boolean isRunning_;
+    private volatile boolean isRunning_;
+
+    // sessions are torn down here, never on the protocol's own worker threads (errors and quit requests arrive on
+    // those): stopping joins the workers and deletes their io_service, which a worker can't do to itself
+    private final ExecutorService stopExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODA stop"));
+
+    // for the widget and USB auto-start, which have no binding to the service
+    private static volatile boolean sessionActive_;
+
+    public static boolean isSessionActive(){
+        return sessionActive_;
+    }
 
     public ODAService() {}
 
@@ -85,6 +101,8 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
                         if (Log.isInfo()) Log.i(TAG, "device opened");
                         androidAutoEntity_ = AndroidAutoEntityFactory.create(this, device, surfaceView, keyHolder);
                         androidAutoEntity_.start(this);
+                        Settings.instance().connectivity.rememberDevice(USBManager.deviceId(device));
+                        setSessionActive(true);
                     } else {
                         Log.e(TAG, "Error in open usb device");
                         onAndroidAutoQuitOnError("USB OPEN DEVICE", -1);
@@ -96,6 +114,12 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 //                    onAndroidAutoQuit();
                     return;
                 }
+            } else {
+                // nothing to start: close the (still black) Android Auto screen instead of leaving it open
+                if (Log.isWarn()) Log.w(TAG, "no aoap device, nothing to start");
+                mainHandler_.post(() -> Toast.makeText(this, R.string.start_no_phone, Toast.LENGTH_LONG).show());
+                localBroadcastManager_.sendBroadcast(new Intent(ODAService.STOP_ACTION));
+                return;
             }
             if (Log.isInfo()) Log.i(TAG, "start usb thead completed");
         });
@@ -115,6 +139,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
                     TCPEndpoint tcpEndpoint = new TCPEndpoint(ipAddress);
                     androidAutoEntity_ = AndroidAutoEntityFactory.create(this, tcpEndpoint, surfaceView, keyHolder);
                     androidAutoEntity_.start(this);
+                    setSessionActive(true);
                 }
                 if (Log.isInfo()) Log.i(TAG, "start wifi thead completed");
             } catch (TCPConnectException e){
@@ -139,7 +164,12 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
         androidAutoEntity_.gainFocus();
     }
 
+    /** Ends the session, asynchronously on the stop thread. */
     public void stop(){
+        stopExecutor_.execute(this::stopNow);
+    }
+
+    private synchronized void stopNow(){
         if (!isRunning_) {
             if (Log.isInfo()) Log.i(TAG, "service not running, already stopped?");
             return;
@@ -163,12 +193,18 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
         }
 
         startThread_ = null;
+        setSessionActive(false);
 
         Intent stopIntent = new Intent(ODAService.STOP_ACTION);
         localBroadcastManager_.sendBroadcast(stopIntent);
 
         Intent service = new Intent(this, ODAService.class);
         stopService(service);
+    }
+
+    private void setSessionActive(boolean active){
+        sessionActive_ = active;
+        mainHandler_.post(() -> ConnectionWidget.refresh(this));
     }
 
     @Override
@@ -200,6 +236,8 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     @Keep
     @Override
     public void onAndroidAutoQuit() {
+        // no error: the phone asked to stop, or stopped answering pings (the native log above says which)
+        if (Log.isInfo()) Log.i(TAG, "Android Auto ended by the protocol, not by a USB or Wi-Fi error");
         stop();
     }
 

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- one device in the USB device picker -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/SettingsRow"
+    android:background="@drawable/row_bg"
+    android:clickable="true">
+
+    <LinearLayout style="@style/SettingsLabelBox">
+
+        <TextView
+            android:id="@+id/usb_device_name"
+            style="@style/SettingsLabel"
+            android:ellipsize="end"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/usb_device_maker"
+            style="@style/SettingsSummary"
+            android:ellipsize="end"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/usb_device_in_use"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/usb_devices_in_use"
+        android:textColor="@color/oda_accent_light"
+        android:textSize="17dp"
+        android:visibility="gone" />
+</LinearLayout>

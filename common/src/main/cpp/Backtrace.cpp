@@ -132,6 +132,7 @@ bool Backtrace::addAddress(BacktraceState *state, uintptr_t ip) {
 void Backtrace::LibunwindWithRegisters(BacktraceState *state) {
     assert(state);
 
+#if defined(__arm__) // NDK 17 ships libunwind for ARM only; non-ARM builds (x86 emulator) skip unwinding
     // Initialize unw_context and unw_cursor.
     unw_context_t unw_context = {};
     unw_getcontext(&unw_context);
@@ -183,4 +184,5 @@ void Backtrace::LibunwindWithRegisters(BacktraceState *state) {
 
         //printf("unw_is_signal_frame(): %i\n", unw_is_signal_frame(&unw_cursor));
     }
+#endif
 }

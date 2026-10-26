@@ -8,11 +8,12 @@ ANDROID_LIB := $(EXT_LIB)/$(TARGET_ARCH_ABI)/system/hrv
 LOCAL_MODULE    := libomxvideocodec-jni
 LOCAL_SRC_FILES := OMXVideoCodec.cpp \
                    OMXDecoder.cpp \
+                   LowLatencyOMX.cpp \
                    OMXSource.cpp \
                    it_smg_libs_videocodec_OMXVideoCodec.cpp
 
 
-LOCAL_LDLIBS += -llog -landroid -l$(ANDROID_LIB)/libstagefright.so -l$(ANDROID_LIB)/libutils.so -l$(ANDROID_LIB)/libcutils.so
+LOCAL_LDLIBS += -llog -landroid -l$(ANDROID_LIB)/libstagefright.so -l$(ANDROID_LIB)/libmedia.so -l$(ANDROID_LIB)/libbinder.so -l$(ANDROID_LIB)/libutils.so -l$(ANDROID_LIB)/libcutils.so
 
 LOCAL_C_INCLUDES := $(EXT_LIB)/include/system/core \
                     $(EXT_LIB)/include/base \

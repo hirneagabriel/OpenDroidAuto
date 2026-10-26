@@ -1,6 +1,7 @@
 package it.smg.hu.ui;
 
 import android.app.Activity;
+import android.app.WallpaperManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -10,9 +11,12 @@ import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.ConnectivityManager;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.fragment.app.FragmentActivity;
@@ -67,6 +71,8 @@ public class MainActivity extends FragmentActivity {
             isOpenFromMain_ = false;
             isOpenFromUsb_ = true;
         } else if (Intent.ACTION_MAIN.equalsIgnoreCase(intent.getAction())) {
+            showWallpaper();
+
             HomeFragment f = new HomeFragment();
             Bundle args = new Bundle();
             args.putBoolean(HomeFragment.AUTOSTART, true);
@@ -81,6 +87,26 @@ public class MainActivity extends FragmentActivity {
             isOpenFromUsb_ = false;
         }
 
+    }
+
+    /**
+     * Puts the system wallpaper (the car's home screen picture) behind the home page. The window stays translucent
+     * for the invisible USB launch, so FLAG_SHOW_WALLPAPER would leave the launcher showing through.
+     */
+    private void showWallpaper(){
+        ImageView wallpaper = findViewById(R.id.home_wallpaper);
+        Drawable drawable = null;
+        try {
+            drawable = WallpaperManager.getInstance(this).getDrawable();
+        } catch (RuntimeException e) {
+            Log.e(TAG, "can't read the wallpaper", e);
+        }
+        if (drawable != null) {
+            wallpaper.setImageDrawable(drawable);
+        } else {
+            wallpaper.setImageResource(R.drawable.top_bar);
+        }
+        wallpaper.setVisibility(View.VISIBLE);
     }
 
     private void registerReceiver(){
@@ -111,7 +137,8 @@ public class MainActivity extends FragmentActivity {
 
             if (Log.isDebug()) Log.d(TAG, intent.getAction());
             if (isOpenFromUsb_) {
-                if (intent.getAction().equals(USBManager.ATTACH_AOAP_DEVICE)) {
+                // a known phone is started by USBManager without asking
+                if (intent.getAction().equals(USBManager.ATTACH_AOAP_DEVICE) && !usbManager_.isKnownDevice()) {
                     if (Log.isDebug()) Log.d(TAG, "open popup activity");
                     NotificationFactory.instance().notifyStartRequest();
 
@@ -195,6 +222,8 @@ public class MainActivity extends FragmentActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (Log.isDebug()) Log.d(TAG, "onDestroy");
+        // the wallpaper bitmap stays cached in the process otherwise
+        WallpaperManager.getInstance(this).forgetLoadedWallpaper();
     }
 
     private boolean doubleBackToExitPressedOnce = false;

@@ -157,6 +157,7 @@ public class InputDevice extends it.smg.libs.aasdk.projection.InputDevice implem
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+        long start = System.nanoTime();
         int count = event.getPointerCount();
         if (count > 0) {
             TouchAction[] ta = new TouchAction[count];
@@ -168,6 +169,7 @@ public class InputDevice extends it.smg.libs.aasdk.projection.InputDevice implem
             }
             sendTouchEvent(event.getActionMasked(), event.getActionIndex(), ta);
         }
+        InputStats.instance().onTouch(event, System.nanoTime() - start);
         return true;
     }
 

@@ -1,28 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Connection -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F1F1F1"
-    android:layout_marginBottom="64dp">
+    style="@style/SettingsPage">
 
-    <CheckBox
-        android:id="@+id/enable_ad2p"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/conn_settings_enableAd2p"
-        android:textColor="#000" />
+    <TextView
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_phones" />
 
-    <CheckBox
-        android:id="@+id/enable_hfp"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/conn_settings_enableHfp"
-        android:textColor="#000" />
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/conn_settings_known_devices" />
+                <TextView
+                    android:id="@+id/forget_devices_summary"
+                    style="@style/SettingsSummary" />
+            </LinearLayout>
+            <Button
+                android:id="@+id/forget_devices"
+                style="@style/SettingsButton"
+                android:text="@string/conn_settings_forget" />
+        </LinearLayout>
+    </LinearLayout>
 
+    <TextView
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_bluetooth" />
 
+    <LinearLayout style="@style/SettingsSection">
+        <CheckBox
+            android:id="@+id/enable_ad2p"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/conn_settings_enableAd2p" />
+        <CheckBox
+            android:id="@+id/enable_hfp"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/conn_settings_enableHfp" />
+    </LinearLayout>
+
+    <TextView
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_wifi" />
+
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout
+            style="@style/SettingsRow"
+            android:background="@drawable/row_bg"
+            android:clickable="true"
+            android:tag="toggle_row">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/advanced_settings_enablewifi" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/advanced_settings_enablewifi_summary" />
+            </LinearLayout>
+            <CheckBox
+                android:id="@+id/enable_wifi"
+                style="@style/SettingsSwitch" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

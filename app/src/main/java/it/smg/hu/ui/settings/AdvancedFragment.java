@@ -10,7 +10,7 @@ import android.widget.Spinner;
 
 import it.smg.hu.R;
 import it.smg.hu.config.Settings;
-import it.smg.hu.manager.HondaConnectManager;
+import it.smg.hu.manager.ResourceMonitor;
 import it.smg.libs.common.Log;
 
 public class AdvancedFragment extends BaseSettingsFragment {
@@ -35,8 +35,11 @@ public class AdvancedFragment extends BaseSettingsFragment {
             return null;
         });
 
-        CheckBox enableWifi = view.findViewById(R.id.enable_wifi);
-        initCheckBox(enableWifi, settings.advanced, Settings.Advanced.ADVANCED_ENABLE_WIFI, Settings.Advanced.ADVANCED_ENABLE_WIFI_DEFAULT_VALUE);
+        CheckBox resourceMonitor = view.findViewById(R.id.resource_monitor);
+        initCheckBox(resourceMonitor, settings.advanced, Settings.Advanced.ADVANCED_RESOURCE_MONITOR, Settings.Advanced.ADVANCED_RESOURCE_MONITOR_DEFAULT_VALUE, () -> {
+            ResourceMonitor.instance().update();
+            return null;
+        });
 
         Spinner logLevel = view.findViewById(R.id.loglevel);
         initSpinner(logLevel, R.array.loglevel_labels, R.array.loglevel_values, settings.advanced, Settings.Advanced.ADVANCED_LOG_LEVEL, Settings.Advanced.ADVANCED_LOG_LEVEL_DEFAULT_VALUE, () -> {
@@ -50,39 +53,29 @@ public class AdvancedFragment extends BaseSettingsFragment {
             return null;
         });
 
-        CheckBox enableHondaIntegration = view.findViewById(R.id.enable_hondaintegration);
-        initCheckBox(enableHondaIntegration, settings.advanced, Settings.Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION, Settings.Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION_DEFAULT_VALUE, () -> {
-            if (Settings.instance().advanced.hondaIntegrationEnabled()) {
-                HondaConnectManager.init(getActivity().getApplicationContext());
-            }
-            return null;
-        });
+        EditText huName = view.findViewById(R.id.hu_name);
+        initEditText(huName, settings.car, Settings.Car.CAR_SETTINGS_HU_NAME, Settings.Car.CAR_SETTINGS_HU_NAME_DEFAULT_VALUE, null);
 
-        CheckBox enableHondaMicVr = view.findViewById(R.id.enable_hondamicvr);
-        initCheckBox(enableHondaMicVr, settings.advanced, Settings.Advanced.ADVANCED_ENABLE_HONDA_MIC_VR, Settings.Advanced.ADVANCED_ENABLE_HONDA_MIC_VR_DEFAULT_VALUE);
+        EditText carModel = view.findViewById(R.id.car_model);
+        initEditText(carModel, settings.car, Settings.Car.CAR_SETTINGS_MODEL, Settings.Car.CAR_SETTINGS_MODEL_DEFAULT_VALUE, null);
 
-        Spinner swMode = view.findViewById(R.id.sw_mode);
-        initSpinner(swMode, R.array.swmode, R.array.swmode, settings.advanced, Settings.Advanced.ADVANCED_SW_MODE, Settings.Advanced.ADVANCED_SW_MODE_DEFAULT_VALUE, () -> {
-            EditText swIdx =  view.findViewById(R.id.steeringwheel_idx);
-            switch (settings.advanced.swMode()){
-                case HondaConnectManager.SWMode.SW_SERVICE:
-                    swIdx.setEnabled(true);
-                    break;
-//                case HondaConnectManager.SWMode.MODEMGR_KEY_CALLBACK:
-//                    swIdx.setEnabled(false);
-//                    break;
-                default:
-                    break;
-            }
+        EditText carYear = view.findViewById(R.id.car_year);
+        initEditText(carYear, settings.car, Settings.Car.CAR_SETTINGS_YEAR, Settings.Car.CAR_SETTINGS_YEAR_DEFAULT_VALUE, null);
 
-            return null;
-        });
+        EditText huMaker = view.findViewById(R.id.hu_make);
+        initEditText(huMaker, settings.car, Settings.Car.CAR_SETTINGS_HU_MAKE, Settings.Car.CAR_SETTINGS_HU_MAKE_DEFAULT_VALUE, null);
 
-        EditText modeMgrAudioIdx = view.findViewById(R.id.modemgraudio_idx);
-        initEditText(modeMgrAudioIdx, settings.advanced, Settings.Advanced.ADVANCED_MODEMGRAUDIO_IDX, Settings.Advanced.ADVANCED_MODEMGRAUDIO_IDX_DEFAULT_VALUE);
+        EditText huModel = view.findViewById(R.id.hu_model);
+        initEditText(huModel, settings.car, Settings.Car.CAR_SETTINGS_HU_MODEL, Settings.Car.CAR_SETTINGS_HU_MODEL_DEFAULT_VALUE, null);
 
-        EditText steeringWheelIdx = view.findViewById(R.id.steeringwheel_idx);
-        initEditText(steeringWheelIdx, settings.advanced, Settings.Advanced.ADVANCED_SW_IDX, Settings.Advanced.ADVANCED_SW_IDX_DEFAULT_VALUE);
+        EditText swBuild = view.findViewById(R.id.sw_build);
+        initEditText(swBuild, settings.car, Settings.Car.CAR_SETTINGS_SW_BUILD, Settings.Car.CAR_SETTINGS_SW_BUILD_DEFAULT_VALUE, null);
+
+        EditText swVersion = view.findViewById(R.id.sw_version);
+        initEditText(swVersion, settings.car, Settings.Car.CAR_SETTINGS_SW_VERSION, Settings.Car.CAR_SETTINGS_SW_VERSION_DEFAULT_VALUE, null);
+
+        EditText threads = view.findViewById(R.id.num_threads);
+        initEditText(threads, settings.advanced, Settings.Advanced.ADVANCED_THREADS_NUM, Settings.Advanced.ADVANCED_THREADS_NUM_DEFAULT_VALUE);
 
         return view;
     }

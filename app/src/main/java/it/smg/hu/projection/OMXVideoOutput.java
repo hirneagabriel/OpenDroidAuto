@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import it.smg.libs.common.Log;
 import it.smg.libs.omxvideocodec.OMXVideoCodec;
 
-public class OMXVideoOutput extends VideoOutput /*implements Runnable*/ {
+public class OMXVideoOutput extends VideoOutput implements VideoStats.DecoderStats /*, Runnable*/ {
 
     private static final String TAG = "OMXVideoOutput";
     private OMXVideoCodec videoCodec_;
@@ -49,15 +49,19 @@ public class OMXVideoOutput extends VideoOutput /*implements Runnable*/ {
     public boolean init() {
         videoCodec_ = new OMXVideoCodec(fps_);
         videoCodec_.setSurface(surfaceView_.getHolder().getSurface(), surfaceView_.getWidth(), surfaceView_.getHeight());
+        videoCodec_.setLowLatency(settings_.video.decoderLowLatency());
+        videoCodec_.setReleaseEarly(settings_.video.decoderReleaseEarly());
         videoCodec_.init();
         configured_ = true;
         running_ = true;
+        VideoStats.instance().setDecoderStats(this);
         return true;
     }
 
     @Keep
     @Override
     public void write(long timestamp, ByteBuffer data) {
+        VideoStats.instance().onFrame(data.limit());
         if (configured_ && running_) {
             if (Log.isVerbose()) Log.v(TAG, "video message size: " + data.limit());
             videoCodec_.mediaDecode(timestamp, data, data.limit());
@@ -66,8 +70,9 @@ public class OMXVideoOutput extends VideoOutput /*implements Runnable*/ {
 
     @Keep
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if(Log.isInfo()) Log.i(TAG, "stop");
+        VideoStats.instance().setDecoderStats(null);
         if (running_) {
             running_ = false;
             configured_ = false;
@@ -75,6 +80,12 @@ public class OMXVideoOutput extends VideoOutput /*implements Runnable*/ {
             if(Log.isInfo()) Log.i(TAG, "deleted");
             videoCodec_ = null;
         }
+    }
+
+    // synchronized with stop(), which deletes the native codec
+    @Override
+    public synchronized int[] takeDecoderStats() {
+        return videoCodec_ != null ? videoCodec_.takeStats() : null;
     }
 
     @Override

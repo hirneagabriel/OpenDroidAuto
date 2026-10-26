@@ -7,10 +7,13 @@ import androidx.multidex.MultiDexApplication;
 import it.smg.hu.config.ODALog;
 import it.smg.hu.config.Settings;
 import it.smg.hu.manager.HondaConnectManager;
+import it.smg.hu.manager.ResourceMonitor;
 import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 
 import it.smg.hu.ui.notification.AppBadge;
+import it.smg.hu.ui.notification.NotificationFactory;
+import it.smg.hu.widget.ConnectionWidget;
 import it.smg.libs.aasdk.Runtime;
 import it.smg.libs.common.Log;
 
@@ -54,6 +57,11 @@ public class ODAApplication extends MultiDexApplication {
         USBManager.init(getApplicationContext());
         WIFIManager.init(getApplicationContext());
         AppBadge.init(getApplicationContext());
+        // PlayerActivity uses it before ODAService (which also inits it) is created, e.g. when a widget opens Android Auto
+        NotificationFactory.init(getApplicationContext());
+        ResourceMonitor.init(getApplicationContext());
+        // a widget left showing the last process's state
+        ConnectionWidget.refresh(getApplicationContext());
         if (Settings.instance().advanced.hondaIntegrationEnabled()) {
             HondaConnectManager.init(getApplicationContext());
         }

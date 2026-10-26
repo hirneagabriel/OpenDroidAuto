@@ -21,6 +21,9 @@ private:
 
     aasdk::io::strand strand_;
     boost::asio::deadline_timer timer_;
+    // pings the phone may leave unanswered before the session is closed (at 5 s each, ~20 s of silence)
+    static constexpr int64_t cMaxMissedPongs = 4;
+
     time_t duration_;
     bool cancelled_;
     Promise::Pointer promise_;

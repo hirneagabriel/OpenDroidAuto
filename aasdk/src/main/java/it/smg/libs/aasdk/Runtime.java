@@ -13,6 +13,12 @@ public class Runtime {
     private native void nativeDelete();
     private native void nativeStartIOServiceWorker(int threads);
     private native void nativeStopIOServiceWorker();
+    private static native long[] nativeTakeLinkStats();
+
+    /** {ping count, ping avg us, ping max us, touches sent, touch send avg us, max us} since the previous call. */
+    public static long[] takeLinkStats(){
+        return nativeTakeLinkStats();
+    }
 
     @Keep
     private long handle_;

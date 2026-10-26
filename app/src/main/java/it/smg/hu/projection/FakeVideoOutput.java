@@ -33,7 +33,9 @@ public class FakeVideoOutput extends VideoOutput {
 
     @Keep
     @Override
-    public void write(long timestamp, ByteBuffer data) {}
+    public void write(long timestamp, ByteBuffer data) {
+        VideoStats.instance().onFrame(data.limit());
+    }
 
     @Keep
     @Override

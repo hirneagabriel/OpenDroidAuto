@@ -14,7 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Spinner;
-import android.widget.Toast;
+import android.widget.TextView;
 
 import it.smg.hu.R;
 import it.smg.hu.config.Settings;
@@ -56,8 +56,20 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
             if (keyHolder_ != null) {
                 keyHolder_.setOnKeyListener(null);
             }
+            // nothing pressed in time: show the code it had before
+            if (currentButton_ != null && getView() != null) {
+                KeyMap c = (KeyMap) currentButton_.getTag();
+                showCode(getView(), c, settings.keymap.key(c.keyName() + "_code"));
+            }
             currentButton_ = null;
         };
+
+        // the car sends the wheel buttons only through the Honda services, so there is nothing to learn without them
+        boolean canLearn = keyHolder_ != null;
+        if (!canLearn) {
+            TextView hint = view.findViewById(R.id.keymap_hint);
+            hint.setText(R.string.keymap_settings_hint_no_honda);
+        }
 
         for (KeyMap c : KeyMap.values()){
             if (c.id() != -1){
@@ -66,13 +78,11 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
                 int currentValue = settings.keymap.key(c.keyName() + "_code");
                 if (currentValue == 0){
                     settings.keymap.key(c.keyName() + "_code", c.defaultValue());
-                    b.setText("" + c.defaultValue());
-                } else if (currentValue != -1){
-                    b.setText("" + currentValue);
-                } else {
-                    b.setText("");
+                    currentValue = c.defaultValue();
                 }
+                showCode(view, c, currentValue);
 
+                b.setEnabled(canLearn);
                 b.setOnClickListener(this);
                 b.setOnLongClickListener(this);
                 b.setTag(c);
@@ -116,13 +126,20 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
     @Override
     public void onClick(View v) {
         Button b = (Button)v;
+        if (currentButton_ != null && currentButton_ != b) {
+            // was learning another button: put its code back
+            KeyMap previous = (KeyMap) currentButton_.getTag();
+            showCode(getView(), previous, settings.keymap.key(previous.keyName() + "_code"));
+        }
         currentButton_ = b;
         KeyMap c = (KeyMap) b.getTag();
 
         if (keyHolder_ != null) {
-            Toast.makeText(getActivity(), "Press a key to assign to " + c.keyName(), Toast.LENGTH_SHORT).show();
+            TextView value = getView().findViewById(c.valueId());
+            value.setText(R.string.keymap_settings_code_waiting);
             keyHolder_.setOnKeyListener(this);
 
+            handler_.removeCallbacks(unsetKeyListener_);
             handler_.postDelayed(unsetKeyListener_, 5000);
         }
 
@@ -144,7 +161,7 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
         KeyMap c = (KeyMap) b.getTag();
         if (Log.isDebug()) Log.d(TAG, "Reset " + c.keyName() + "_code button");
         settings.keymap.key(c.keyName() + "_code", -1);
-        b.setText("");
+        showCode(getView(), c, -1);
 
         return true;
     }
@@ -155,14 +172,17 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
             KeyMap c = (KeyMap) currentButton_.getTag();
             if (Log.isDebug()) Log.d(TAG, "Set " + c.keyName() + "_code button to code " + keyCode);
             settings.keymap.key(c.keyName() + "_code", keyCode);
-
-            Button b = getView().findViewById(c.id());
-            b.setText(String.valueOf(keyCode));
         }
 
+        handler_.removeCallbacks(unsetKeyListener_);
         unsetKeyListener_.run();
 
         return true;
+    }
+
+    private void showCode(View view, KeyMap c, int code){
+        TextView value = view.findViewById(c.valueId());
+        value.setText(code == -1 ? getString(R.string.keymap_settings_code_none) : getString(R.string.keymap_settings_code, code));
     }
 
     @Override
@@ -171,20 +191,22 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
     }
 
     public enum KeyMap {
-        LEFT(KEYMAP_BTN_LEFT, R.id.keycode_left, -65532, Settings.Keymap.KEYMAP_BTN_LEFT_DEFAULT_VALUE),
-        RIGHT(KEYMAP_BTN_RIGHT, R.id.keycode_right, -65533, Settings.Keymap.KEYMAP_BTN_RIGHT_DEFAULT_VALUE),
-        SOURCE(KEYMAP_BTN_SOURCE, R.id.keycode_source, -65531, Settings.Keymap.KEYMAP_BTN_SOURCE_DEFAULT_VALUE),
-        PLUS(KEYMAP_BTN_PLUS, R.id.keycode_plus, -65535, Settings.Keymap.KEYMAP_BTN_PLUS_DEFAULT_VALUE),
-        MINUS(KEYMAP_BTN_MINUS, R.id.keycode_min, -65534, Settings.Keymap.KEYMAP_BTN_MINUS_DEFAULT_VALUE);
+        LEFT(KEYMAP_BTN_LEFT, R.id.keycode_left, R.id.keycode_left_value, -65532, Settings.Keymap.KEYMAP_BTN_LEFT_DEFAULT_VALUE),
+        RIGHT(KEYMAP_BTN_RIGHT, R.id.keycode_right, R.id.keycode_right_value, -65533, Settings.Keymap.KEYMAP_BTN_RIGHT_DEFAULT_VALUE),
+        SOURCE(KEYMAP_BTN_SOURCE, R.id.keycode_source, R.id.keycode_source_value, -65531, Settings.Keymap.KEYMAP_BTN_SOURCE_DEFAULT_VALUE),
+        PLUS(KEYMAP_BTN_PLUS, R.id.keycode_plus, R.id.keycode_plus_value, -65535, Settings.Keymap.KEYMAP_BTN_PLUS_DEFAULT_VALUE),
+        MINUS(KEYMAP_BTN_MINUS, R.id.keycode_min, R.id.keycode_min_value, -65534, Settings.Keymap.KEYMAP_BTN_MINUS_DEFAULT_VALUE);
 
         private final String keyName_;
-        private final int id_;;
+        private final int id_;
+        private final int valueId_;
         private final int defaultValue_;;
         private final int defaultAction_;;
 
-        KeyMap(String keyName, int id, int defaultValue, int defaultAction){
+        KeyMap(String keyName, int id, int valueId, int defaultValue, int defaultAction){
             keyName_ = keyName;
             id_ = id;
+            valueId_ = valueId;
             defaultValue_ = defaultValue;
             defaultAction_ = defaultAction;
         }
@@ -195,6 +217,11 @@ public class KeymapFragment extends BaseSettingsFragment implements View.OnClick
 
         public int id(){
             return id_;
+        }
+
+        /** The text under the button's name that shows its learned key code. */
+        public int valueId(){
+            return valueId_;
         }
 
         public int defaultValue(){

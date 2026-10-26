@@ -1,10 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- one choice in a settings dropdown list -->
 <CheckedTextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/text1"
-    style="?android:attr/spinnerDropDownItemStyle"
-    android:singleLine="true"
     android:layout_width="match_parent"
-    android:textColor="#000"
-    android:background="#F1F1F1"
-    android:layout_height="48dp"
-    android:gravity="center"
-    android:ellipsize="marquee"/>
+    android:layout_height="52dp"
+    android:background="@drawable/row_bg"
+    android:ellipsize="end"
+    android:gravity="center_vertical"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
+    android:singleLine="true"
+    android:textColor="@color/oda_text"
+    android:textSize="20dp" />

@@ -1,4 +1,6 @@
+#include "service/LinkStats.h"
 #include <Log.h>
+#include <thread>
 #include <google/protobuf/stubs/common.h>
 #include "it_smg_libs_aasdk_Runtime.h"
 #include "Backtrace.h"
@@ -28,7 +30,6 @@ JRuntime::~JRuntime() {
 
 void JRuntime::stopIOServiceWorkers() {
     if(Log::isDebug()) Log_d("stopping IOService Workers");
-//    i = 0;
 
     if (!ioService_.stopped()) {
         if(Log::isDebug()) Log_d("stop ioService");
@@ -36,27 +37,23 @@ void JRuntime::stopIOServiceWorkers() {
         ioService_.stop();
     }
 
-    if(Log::isDebug()) Log_d("stop all threads");
-    auto iter = threadPool_.begin();
-    while (iter != threadPool_.end()){
-        iter->detach();
-        if (iter->joinable()){
-            if(Log::isDebug()) Log_d("join thread");
-            iter->join();
+    // wait for every worker to leave run(): this JRuntime (and its io_service) is deleted right after, and
+    // workers that kept running used to leak and run on in the deleted io_service. ODAService stops sessions
+    // on its own thread, never on a worker, so this can't join itself; if it ever is, skip that one.
+    const auto self = std::this_thread::get_id();
+    for (auto& worker : threadPool_) {
+        if (!worker.joinable()) continue;
+        if (worker.get_id() == self) {
+            if(Log::isWarn()) Log_w("stopping IOService Workers from a worker thread, not joining it");
+            worker.detach();
+        } else {
+            worker.join();
         }
-        threadPool_.erase(iter);
     }
-
-    if(Log::isDebug()) Log_d("clear threadpool");
     threadPool_.clear();
-
-//    std::this_thread::sleep_for (std::chrono::seconds(1));
-//    std::unique_lock<std::mutex> lock(m);
-//    v.wait(lock, [&] { return i == 0; });
-//    if(Log::isDebug()) Log_d("all threads stopped");
+    if(Log::isDebug()) Log_d("all IOService Workers stopped");
 
     ioService_.restart();
-//    ioService_.reset();
 }
 
 void JRuntime::startIOServiceWorkers(int threads) {
@@ -158,3 +155,19 @@ Java_it_smg_libs_aasdk_Runtime_nativeStopIOServiceWorker(JNIEnv *env, jobject th
 //Java_it_smg_libs_aasdk_Runtime_nativeCrash(JNIEnv *env, jclass clazz) {
 //    abort();
 //}
+
+
+extern "C"
+JNIEXPORT jlongArray JNICALL
+Java_it_smg_libs_aasdk_Runtime_nativeTakeLinkStats(JNIEnv *env, jclass clazz) {
+    int64_t values[6];
+    service::linkstats::take(values);
+
+    jlong jvalues[6];
+    for (int i = 0; i < 6; i++) {
+        jvalues[i] = (jlong) values[i];
+    }
+    jlongArray result = env->NewLongArray(6);
+    env->SetLongArrayRegion(result, 0, 6, jvalues);
+    return result;
+}

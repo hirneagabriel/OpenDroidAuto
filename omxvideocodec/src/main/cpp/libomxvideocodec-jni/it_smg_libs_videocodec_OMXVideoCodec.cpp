@@ -20,8 +20,8 @@ void JOMXVideoCodec::setNativeWindow(ANativeWindow* nativeWindow, int height, in
     omxVideoCodec_->setNativeWindow(nativeWindow, height, width);
 }
 
-status_t JOMXVideoCodec::init(int fps){
-    return omxVideoCodec_->init(fps);
+status_t JOMXVideoCodec::init(int fps, bool lowLatency, bool releaseEarly){
+    return omxVideoCodec_->init(fps, lowLatency, releaseEarly);
 }
 
 void JOMXVideoCodec::shutdown(){
@@ -35,6 +35,14 @@ void JOMXVideoCodec::queueBuffer(common::DataConstBuffer &b, int64_t timestamp) 
 
 void JOMXVideoCodec::setSps(common::DataConstBuffer &b){
     omxVideoCodec_->setSps(b);
+}
+
+void JOMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs) {
+    omxVideoCodec_->takeStats(rendered, maxQueued, latencyAvgUs, latencyMaxUs);
+}
+
+void JOMXVideoCodec::takeStages(int64_t out[]) {
+    omxVideoCodec_->takeStages(out);
 }
 
 JOMXVideoCodec::~JOMXVideoCodec() {
@@ -72,9 +80,9 @@ Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeSurfaceInit(JNIEnv *env, jobj
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeDecoderInit(JNIEnv *env, jobject thiz, jint fps) {
+Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeDecoderInit(JNIEnv *env, jobject thiz, jint fps, jboolean lowLatency, jboolean releaseEarly) {
     JOMXVideoCodec::Pointer jOMXVideoCodec = JOMXVideoCodec::getJOMXVideoCodec(env, thiz);
-    status_t ret = jOMXVideoCodec->init(fps);
+    status_t ret = jOMXVideoCodec->init(fps, lowLatency == JNI_TRUE, releaseEarly == JNI_TRUE);
 
     return ret == 0 ? JNI_TRUE : JNI_FALSE;
 }
@@ -110,4 +118,27 @@ Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeSetSps(JNIEnv *env, jobject t
     common::DataConstBuffer buffer(bufferData, len);
 
     jOMXVideoCodec->setSps(buffer);
+}
+
+
+extern "C"
+JNIEXPORT jintArray JNICALL
+Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeTakeStats(JNIEnv *env, jobject thiz) {
+    JOMXVideoCodec::Pointer jOMXVideoCodec = JOMXVideoCodec::getJOMXVideoCodec(env, thiz);
+
+    uint32_t rendered = 0;
+    int maxQueued = 0;
+    int64_t latencyAvgUs = 0;
+    int64_t latencyMaxUs = 0;
+    jOMXVideoCodec->takeStats(rendered, maxQueued, latencyAvgUs, latencyMaxUs);
+    int64_t stages[OMXSource::cStageCount];
+    jOMXVideoCodec->takeStages(stages);
+
+    // {rendered, peak queued, latency avg ms, max ms, queue wait avg us, decode avg us, decode max us,
+    //  hand-off avg us, frames in decoder avg x10, max}
+    jint values[4 + OMXSource::cStageCount] = {(jint) rendered, (jint) maxQueued, (jint) (latencyAvgUs / 1000), (jint) (latencyMaxUs / 1000)};
+    for (int i = 0; i < OMXSource::cStageCount; i++) values[4 + i] = (jint) stages[i];
+    jintArray result = env->NewIntArray(4 + OMXSource::cStageCount);
+    env->SetIntArrayRegion(result, 0, 4 + OMXSource::cStageCount, values);
+    return result;
 }

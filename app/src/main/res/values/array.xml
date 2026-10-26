@@ -154,6 +154,11 @@
         <item>127</item>
     </integer-array>
 
+    <!-- what the user sees for each swmode value -->
+    <string-array name="swmode_labels">
+        <item>Steering menu service</item>
+        <!--<item>Mode manager key events</item>-->
+    </string-array>
     <string-array name="swmode">
         <item>SW SERVICE</item>
         <!--<item>MODEMGR KEY CALLBACK</item>-->

@@ -8,6 +8,10 @@ import android.preference.PreferenceManager;
 
 import androidx.annotation.Keep;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import it.smg.hu.util.DeviceUtils;
 import it.smg.libs.common.ILog;
 import it.smg.libs.aasdk.configuration.ICarConfiguration;
 
@@ -46,6 +50,14 @@ public class Settings {
         advanced = new Advanced();
         video = new Video();
         audio = new Audio();
+
+        // off-car development on the emulator: no Honda services available, connect over WiFi
+        if (DeviceUtils.isEmulator && !SP.contains(Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION)) {
+            SP.edit()
+                    .putBoolean(Advanced.ADVANCED_ENABLE_HONDA_INTEGRATION, false)
+                    .putBoolean(Advanced.ADVANCED_ENABLE_WIFI, true)
+                    .apply();
+        }
     }
 
     public class Car extends Base implements ICarConfiguration {
@@ -236,6 +248,8 @@ public class Settings {
         public final static String VIDEO_SHOW_MEDIA_NOTIFICATION = "video_show_media_notification";
         public final static String VIDEO_SHOW_NAVIGATION_NOTIFICATION = "video_show_navigation_notification";
         public final static String VIDEO_SHOW_APP_BADGE = "video_show_app_badge";
+        public final static String VIDEO_DECODER_LOW_LATENCY = "video_decoder_low_latency";
+        public final static String VIDEO_DECODER_RELEASE_EARLY = "video_decoder_release_early";
 
         public final static int VIDEO_RESOLUTION_DEFAULT_VALUE = 1; // 480p
         public final static int VIDEO_FPS_DEFAULT_VALUE = 1; // 30 fps
@@ -244,7 +258,10 @@ public class Settings {
         public final static String VIDEO_NIGHT_MODE_DEFAULT_VALUE = ""; //IDayNightSensor.TIME_GPS;
         public final static boolean VIDEO_SHOW_MEDIA_NOTIFICATION_DEFAULT_VALUE = true;
         public final static boolean VIDEO_SHOW_NAVIGATION_NOTIFICATION_DEFAULT_VALUE = true;
-        public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = true;
+        public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = false; // the home screen widget covers getting back to Android Auto
+        public final static boolean VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE = true;
+        // experimental: decoded frames no longer wait for newer input (OMXSource); off until proven on the car
+        public final static boolean VIDEO_DECODER_RELEASE_EARLY_DEFAULT_VALUE = false;
 
         public int resolution(){
             return SP.getInt(VIDEO_RESOLUTION,VIDEO_RESOLUTION_DEFAULT_VALUE);
@@ -269,6 +286,19 @@ public class Settings {
 
         public String margin(){
             return get(VIDEO_MARGIN,VIDEO_MARGIN_DEFAULT_VALUE);
+        }
+
+        public boolean decoderLowLatency(){
+            return get(VIDEO_DECODER_LOW_LATENCY, VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE);
+        }
+        public boolean decoderReleaseEarly(){
+            return get(VIDEO_DECODER_RELEASE_EARLY, VIDEO_DECODER_RELEASE_EARLY_DEFAULT_VALUE);
+        }
+        public void decoderReleaseEarly(boolean value){
+            set(VIDEO_DECODER_RELEASE_EARLY, value);
+        }
+        public void decoderLowLatency(boolean value){
+            set(VIDEO_DECODER_LOW_LATENCY, value);
         }
         public void margin(String value){
             set(VIDEO_MARGIN, value);
@@ -325,6 +355,24 @@ public class Settings {
             SP.edit().putBoolean(CONN_ENABLED_HFP, value).apply();
         }
 
+        // phones (USB serial numbers) that connected before; they start Android Auto as soon as they're plugged in
+        public final static String CONN_KNOWN_DEVICES = "conn_known_devices";
+
+        public boolean isKnownDevice(String serial){
+            return SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()).contains(serial);
+        }
+        public void rememberDevice(String serial){
+            Set<String> devices = new HashSet<>(SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()));
+            if (devices.add(serial)) {
+                SP.edit().putStringSet(CONN_KNOWN_DEVICES, devices).apply();
+            }
+        }
+        public int knownDeviceCount(){
+            return SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()).size();
+        }
+        public void forgetDevices(){
+            SP.edit().remove(CONN_KNOWN_DEVICES).apply();
+        }
 
     }
     public class Audio extends Base {
@@ -500,6 +548,7 @@ public class Settings {
         public final static String ADVANCED_SW_MODE = "swmode";
         public final static String ADVANCED_MODEMGRAUDIO_IDX = "modemgridx";
         public final static String ADVANCED_SW_IDX = "steeringwheelidx";
+        public final static String ADVANCED_RESOURCE_MONITOR = "resourceMonitor";
 
         public final static boolean ADVANCED_ENABLED_DEBUG_DEFAULT_VALUE = false;
         public final static String ADVANCED_LOG_DIR_DEFAULT_VALUE = "/mnt/sdcard/usbdrive2/ODA/";
@@ -511,6 +560,7 @@ public class Settings {
         public final static boolean ADVANCED_ENABLE_HONDA_MIC_VR_DEFAULT_VALUE = true;
         public final static String ADVANCED_SW_MODE_DEFAULT_VALUE = "SW SERVICE";
         public final static int ADVANCED_MODEMGRAUDIO_IDX_DEFAULT_VALUE = 213; // 223 appmode, 220 appmodepic, 213 3rd party, 214 3rd party pic, 197 bt, 92 cam, 98 cd, 196 dab, 216 hdmi, 201 ipod, 222 mirrolink, 221 mirrorlink pic, 255 off, 87 phone, 198 tel rcv, 199 usb audio, 133 voicetag, 136 siri, 96 radio
+        public final static boolean ADVANCED_RESOURCE_MONITOR_DEFAULT_VALUE = false;
         public final static int ADVANCED_SW_IDX_DEFAULT_VALUE = 260; // 258 source, 263 source header, 259 disp, 260 menu, 265 launcher, 266 imid
 
         public void logDir(String logDir){
@@ -599,6 +649,14 @@ public class Settings {
 
         public void steeringWheelIdx(int idx){
             SP.edit().putInt(ADVANCED_SW_IDX, idx).apply();
+        }
+
+        public boolean resourceMonitorEnabled(){
+            return SP.getBoolean(ADVANCED_RESOURCE_MONITOR, ADVANCED_RESOURCE_MONITOR_DEFAULT_VALUE);
+        }
+
+        public void resourceMonitorEnabled(boolean enabled){
+            SP.edit().putBoolean(ADVANCED_RESOURCE_MONITOR, enabled).apply();
         }
     }
 

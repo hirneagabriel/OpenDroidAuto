@@ -27,8 +27,10 @@ OMXVideoCodec::~OMXVideoCodec() {
     omxSource_ = nullptr;
 }
 
-status_t OMXVideoCodec::init(int fps){
+status_t OMXVideoCodec::init(int fps, bool lowLatency, bool releaseEarly){
     fps_ = fps;
+    lowLatency_ = lowLatency;
+    releaseEarly_ = releaseEarly;
     if (Log::isInfo()) Log_i("FPS %d", fps_);
     // Create decoder thread and wait until ready
     if (Log::isInfo()) Log_i("start omxDecoderThread");
@@ -77,7 +79,7 @@ void OMXVideoCodec::init_omxDecoderThread() {
     omxDecoder_ = new OMXDecoder();
     omxDecoder_->setNativeWindow(nativeWindow_);
     omxDecoder_->setSource(omxSource_);
-    omxDecoder_->init();
+    omxDecoder_->init(lowLatency_, releaseEarly_);
 
     std::unique_lock<std::mutex> codeclock(codecMutex_);
     decoderThreadInitialized_ = true;
@@ -105,6 +107,28 @@ void OMXVideoCodec::setNativeWindow(ANativeWindow* nativeWindow, int height, int
 void OMXVideoCodec::setSps(common::DataConstBuffer &b){
     if (Log::isDebug()) Log_d("sps packet len %d", b.size);
     omxSource_->getFormat()->setData(kKeyAVCC, kTypeAVCC, b.cdata, b.size);
+}
+
+void OMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs) {
+    rendered = 0;
+    maxQueued = 0;
+    latencyAvgUs = 0;
+    latencyMaxUs = 0;
+    if (decoderThreadInitialized_ && omxDecoder_ != nullptr && omxSource_ != nullptr) {
+        rendered = omxDecoder_->takeRenderedFrames();
+        maxQueued = omxSource_->takeMaxQueued();
+        int64_t latency[3];
+        omxSource_->takeLatency(latency);
+        latencyAvgUs = latency[1];
+        latencyMaxUs = latency[2];
+    }
+}
+
+void OMXVideoCodec::takeStages(int64_t out[]) {
+    for (int i = 0; i < OMXSource::cStageCount; i++) out[i] = 0;
+    if (decoderThreadInitialized_ && omxSource_ != nullptr) {
+        omxSource_->takeStages(out);
+    }
 }
 
 OMXSource::Pointer OMXVideoCodec::source() {
