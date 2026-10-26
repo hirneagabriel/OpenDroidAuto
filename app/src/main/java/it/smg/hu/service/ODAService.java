@@ -224,6 +224,8 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     @Keep
     @Override
     public void onAndroidAutoQuit() {
+        // no error: the phone asked to stop, or stopped answering pings (the native log above says which)
+        if (Log.isInfo()) Log.i(TAG, "Android Auto ended by the protocol, not by a USB or Wi-Fi error");
         stop();
     }
 

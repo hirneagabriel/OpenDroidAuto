@@ -1,5 +1,6 @@
 #include "Pinger.h"
 #include "service/Pinger.h"
+#include <Log.h>
 
 namespace service
 {
@@ -52,12 +53,17 @@ void Pinger::onTimerExceeded(const boost::system::error_code& error)
     {
         promise_->reject(aasdk::error::Error(aasdk::error::ErrorCode::OPERATION_ABORTED));
     }
-    else if(pingsCount_ - pongsCount_ > 1)
+    else if(pingsCount_ - pongsCount_ > cMaxMissedPongs)
     {
         promise_->reject(aasdk::error::Error());
     }
     else
     {
+        // a phone that stalls for a few seconds (busy, throttled) shouldn't end the session; say so in the log
+        if(pingsCount_ - pongsCount_ > 1 && Log::isWarn())
+        {
+            Log_w("phone hasn't answered %lld pings", (long long)(pingsCount_ - pongsCount_ - 1));
+        }
         promise_->resolve();
     }
 
