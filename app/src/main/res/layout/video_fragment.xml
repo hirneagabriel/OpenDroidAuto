@@ -1,132 +1,133 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Display -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F1F1F1"
-    android:layout_marginBottom="64dp">
+    style="@style/SettingsPage">
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:textColor="#000"
-        android:labelFor="@id/video_resolution"
-        android:text="@string/video_settings_resolution"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_picture" />
 
-    <Spinner
-        android:id="@+id/video_resolution"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:textColor="#000"
-        android:gravity="center_horizontal"
-        android:textAlignment="center"/>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:textColor="#000"
-        android:labelFor="@id/video_fps"
-        android:text="@string/video_settings_fps"/>
-
-    <Spinner
-        android:id="@+id/video_fps"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:textColor="#000"
-        android:gravity="center_horizontal"/>
-
-    <CheckBox
-        android:id="@+id/video_decoder_low_latency"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/video_settings_decoder_low_latency"
-        android:textColor="#000" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/video_dpi"
-        android:textColor="#000"
-        android:text="@string/video_settings_dpi"/>
-
-    <EditText
-        android:id="@+id/video_dpi"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:inputType="number"
-        android:gravity="center_horizontal"
-        android:textColor="#000"
-        android:imeOptions="actionDone" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/video_margin"
-        android:textColor="#000"
-        android:text="@string/video_settings_margin"/>
-
-    <EditText
-        android:id="@+id/video_margin"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text" />
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_resolution" />
+            </LinearLayout>
+            <Spinner
+                android:id="@+id/video_resolution"
+                style="@style/SettingsChoice" />
+        </LinearLayout>
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_fps" />
+            </LinearLayout>
+            <Spinner
+                android:id="@+id/video_fps"
+                style="@style/SettingsChoice" />
+        </LinearLayout>
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_dpi" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_settings_dpi_summary" />
+            </LinearLayout>
+            <EditText
+                android:id="@+id/video_dpi"
+                style="@style/SettingsField"
+                android:inputType="number" />
+        </LinearLayout>
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_margin" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_settings_margin_summary" />
+            </LinearLayout>
+            <EditText
+                android:id="@+id/video_margin"
+                style="@style/SettingsField"
+                android:inputType="text" />
+        </LinearLayout>
+        <LinearLayout
+            style="@style/SettingsRow"
+            android:background="@drawable/row_bg"
+            android:clickable="true"
+            android:tag="toggle_row">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_decoder_low_latency" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_settings_decoder_low_latency_summary" />
+            </LinearLayout>
+            <CheckBox
+                android:id="@+id/video_decoder_low_latency"
+                style="@style/SettingsSwitch" />
+        </LinearLayout>
+    </LinearLayout>
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/video_night_mode"
-        android:textColor="#000"
-        android:text="@string/video_settings_nightmode"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_daynight" />
 
-    <Spinner
-        android:id="@+id/video_night_mode"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:textColor="#000"
-        android:textAlignment="center"/>
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_settings_nightmode" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_settings_nightmode_summary" />
+            </LinearLayout>
+            <Spinner
+                android:id="@+id/video_night_mode"
+                style="@style/SettingsChoice" />
+        </LinearLayout>
+    </LinearLayout>
 
-    <CheckBox
-        android:id="@+id/showMediaNotification"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/video_show_media_notification"
-        android:textColor="#000" />
+    <TextView
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_background" />
 
-    <CheckBox
-        android:id="@+id/showNavigationNotification"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/video_show_navigation_notification"
-        android:textColor="#000" />
-
-    <CheckBox
-        android:id="@+id/showAppBadge"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/video_show_app_badge"
-        android:textColor="#000" />
-
+    <LinearLayout style="@style/SettingsSection">
+        <CheckBox
+            android:id="@+id/showMediaNotification"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/video_show_media_notification" />
+        <CheckBox
+            android:id="@+id/showNavigationNotification"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/video_show_navigation_notification" />
+        <LinearLayout
+            style="@style/SettingsRow"
+            android:background="@drawable/row_bg"
+            android:clickable="true"
+            android:tag="toggle_row">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/video_show_app_badge" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/video_show_app_badge_summary" />
+            </LinearLayout>
+            <CheckBox
+                android:id="@+id/showAppBadge"
+                style="@style/SettingsSwitch" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

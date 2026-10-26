@@ -1,182 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Car -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F1F1F1"
-    android:layout_marginBottom="64dp">
+    style="@style/SettingsPage">
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/hu_name"
-        android:textColor="#000"
-        android:text="@string/car_settings_hu_name"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_driving" />
 
-    <EditText
-        android:id="@+id/hu_name"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text"/>
-
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/car_model"
-        android:textColor="#000"
-        android:text="@string/car_settings_model"/>
-
-    <EditText
-        android:id="@+id/car_model"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text"/>
+    <LinearLayout style="@style/SettingsSection">
+        <CheckBox
+            android:id="@+id/left_drive"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/car_settings_left_drive" />
+        <CheckBox
+            android:id="@+id/hide_clock"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/car_settings_hide_clock" />
+        <CheckBox
+            android:id="@+id/play_media_during_vr"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/car_settings_play_media_during_vr" />
+    </LinearLayout>
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/car_year"
-        android:textColor="#000"
-        android:text="@string/car_settings_year"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_integration" />
 
-    <EditText
-        android:id="@+id/car_year"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:inputType="number"
-        android:gravity="center_horizontal"
-        android:textColor="#000"
-        android:imeOptions="actionDone" />
-
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/hu_make"
-        android:textColor="#000"
-        android:text="@string/car_settings_hu_make"/>
-
-    <EditText
-        android:id="@+id/hu_make"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text" />
-
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout
+            style="@style/SettingsRow"
+            android:background="@drawable/row_bg"
+            android:clickable="true"
+            android:tag="toggle_row">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/advanced_settings_enablehondaintegration" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/advanced_settings_enablehondaintegration_summary" />
+            </LinearLayout>
+            <CheckBox
+                android:id="@+id/enable_hondaintegration"
+                style="@style/SettingsSwitch" />
+        </LinearLayout>
+        <CheckBox
+            android:id="@+id/enable_hondamicvr"
+            style="@style/SettingsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/advanced_settings_enablehondamicvr" />
+    </LinearLayout>
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/hu_model"
-        android:textColor="#000"
-        android:text="@string/car_settings_hu_model"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_steering" />
 
-    <EditText
-        android:id="@+id/hu_model"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text" />
-
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/sw_build"
-        android:textColor="#000"
-        android:text="@string/car_settings_sw_build"/>
-
-    <EditText
-        android:id="@+id/sw_build"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text" />
-
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/advanced_settings_swmode" />
+            </LinearLayout>
+            <Spinner
+                android:id="@+id/sw_mode"
+                style="@style/SettingsChoice" />
+        </LinearLayout>
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/advanced_settings_steeringWheelIdx" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/advanced_settings_steeringWheelIdx_summary" />
+            </LinearLayout>
+            <EditText
+                android:id="@+id/steeringwheel_idx"
+                style="@style/SettingsField"
+                android:inputType="number" />
+        </LinearLayout>
+    </LinearLayout>
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:labelFor="@id/sw_version"
-        android:textColor="#000"
-        android:text="@string/car_settings_sw_version"/>
+        style="@style/SettingsHeader"
+        android:text="@string/settings_section_audio" />
 
-    <EditText
-        android:id="@+id/sw_version"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:gravity="center_horizontal"
-        android:imeOptions="actionDone"
-        android:maxLines="1"
-        android:textColor="#000"
-        android:inputType="text" />
-
-    <CheckBox
-        android:id="@+id/play_media_during_vr"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:textColor="#000"
-        android:text="@string/car_settings_play_media_during_vr" />
-
-    <CheckBox
-        android:id="@+id/hide_clock"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:textColor="#000"
-        android:text="@string/car_settings_hide_clock" />
-
-    <CheckBox
-        android:id="@+id/left_drive"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:textColor="#000"
-        android:text="@string/car_settings_left_drive" />
-
-<!--
-    <CheckBox
-        android:id="@+id/aa_wifi"
-        android:layout_width="wrap_content"
-        android:layout_height="64dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:text="@string/car_settings_aa_wifi" />
--->
+    <LinearLayout style="@style/SettingsSection">
+        <LinearLayout style="@style/SettingsRow">
+            <LinearLayout style="@style/SettingsLabelBox">
+                <TextView
+                    style="@style/SettingsLabel"
+                    android:text="@string/advanced_settings_modeMgrAudioIdx" />
+                <TextView
+                    style="@style/SettingsSummary"
+                    android:text="@string/advanced_settings_modeMgrAudioIdx_summary" />
+            </LinearLayout>
+            <EditText
+                android:id="@+id/modemgraudio_idx"
+                style="@style/SettingsField"
+                android:inputType="number" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

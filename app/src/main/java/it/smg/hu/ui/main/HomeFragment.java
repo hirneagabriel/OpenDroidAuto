@@ -1,6 +1,5 @@
 package it.smg.hu.ui.main;
 
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -11,7 +10,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -23,6 +21,7 @@ import it.smg.hu.config.Settings;
 import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 import it.smg.hu.service.ODAService;
+import it.smg.hu.ui.Fonts;
 import it.smg.hu.ui.MainActivity;
 import it.smg.hu.ui.PlayerActivity;
 import it.smg.hu.ui.SettingsActivity;
@@ -35,12 +34,16 @@ public class HomeFragment extends Fragment {
 
     public static final String AUTOSTART = "enableAutostart";
 
-    private ImageView usbIconConnection_;
+    private View aaTile_;
+    private ImageView aaLogo_;
+    private TextView aaStatus_;
     private TextView txtUsbIconConnection_;
-    private ImageView wifiIconConnection_;
+    private View wifiTile_;
     private TextView txtWifiIconConnection_;
-    private Button startBtn_;
-    private Button startUsbBtn_;
+
+    // what the Android Auto tile starts: USB when a phone is plugged in, else Wi-Fi (debug) when connected
+    private String usbDeviceName_;
+    private String wifiSsid_;
 
     private BroadcastReceiver localReceiver_;
     private LocalBroadcastManager localBroadcastManager_;
@@ -69,76 +72,103 @@ public class HomeFragment extends Fragment {
 
         initUI(view);
 
-        return view;
+        return Fonts.apply(view);
     }
 
     private void initUI(View view){
-        usbIconConnection_ = view.findViewById(R.id.usbIcon);
-        usbIconConnection_.setImageResource(R.drawable.usb_dis);
+        aaTile_ = view.findViewById(R.id.aaTile);
+        aaLogo_ = view.findViewById(R.id.aaLogo);
+        aaStatus_ = view.findViewById(R.id.aaStatus);
         txtUsbIconConnection_ = view.findViewById(R.id.txtUsbIcon);
-        txtUsbIconConnection_.setText("");
-
-        Button settingsBtn = view.findViewById(R.id.settingsBtn);
-
-        wifiIconConnection_ = view.findViewById(R.id.wifiIcon);
-        wifiIconConnection_.setImageResource(R.drawable.wifi_dis);
+        wifiTile_ = view.findViewById(R.id.wifiTile);
         txtWifiIconConnection_ = view.findViewById(R.id.txtWifiIcon);
-        txtWifiIconConnection_.setText("");
-        startBtn_ = view.findViewById(R.id.startBtn);
-        startBtn_.setEnabled(false);
-        startBtn_.setAlpha(0.5f);
 
-        if (settings_.advanced.enableWiFi()) {
-            startBtn_.setVisibility(View.VISIBLE);
-            wifiIconConnection_.setVisibility(View.VISIBLE);
-            txtWifiIconConnection_.setVisibility(View.VISIBLE);
-        } else {
-            startBtn_.setVisibility(View.GONE);
-            wifiIconConnection_.setVisibility(View.GONE);
-            txtWifiIconConnection_.setVisibility(View.GONE);
-        }
+        aaTile_.setOnClickListener(c -> {
+            if (usbDeviceName_ != null || ODAService.isSessionActive()) {
+                if (Log.isInfo()) Log.i(TAG, "Starting in USB mode");
+                start(ODAService.MODE_USB);
+            } else if (wifiSsid_ != null) {
+                if (Log.isInfo()) Log.i(TAG, "Starting in WiFi mode");
+                start(ODAService.MODE_WIFI);
+            }
+        });
 
-        startUsbBtn_ = view.findViewById(R.id.startUsbBtn);
-        startUsbBtn_.setEnabled(false);
-        startUsbBtn_.setAlpha(0.5f);
-        Button exit = view.findViewById(R.id.exitBtn);
+        view.findViewById(R.id.usbTile).setOnClickListener(v -> {
+            new DeviceListDialog(getActivity()).show();
+        });
 
-        settingsBtn.setOnClickListener(c -> {
+        wifiTile_.setOnClickListener(c -> {
+            if (wifiSsid_ != null) {
+                if (Log.isInfo()) Log.i(TAG, "Starting in WiFi mode");
+                start(ODAService.MODE_WIFI);
+            }
+        });
+
+        view.findViewById(R.id.settingsTile).setOnClickListener(c -> {
             Intent i = new Intent(getContext(), SettingsActivity.class);
             startActivityForResult(i, MainActivity.SETTINGS_ACTIVITY_REQUEST);
         });
 
-        startBtn_.setOnClickListener(c -> {
-            if (Log.isInfo()) Log.i(TAG, "Starting in WiFi mode");
-            start(ODAService.MODE_WIFI);
-        });
-
-        startUsbBtn_.setOnClickListener(c -> {
-            if (Log.isInfo()) Log.i(TAG, "Starting in USB mode");
-            start(ODAService.MODE_USB);
-        });
-
-        exit.setOnClickListener(c -> {
+        view.findViewById(R.id.exitTile).setOnClickListener(c -> {
             // TODO: fix
             ((MainActivity) getActivity()).exitApp();
         });
 
-        usbIconConnection_.setOnClickListener(v -> {
-            AlertDialog dialog = new DeviceListDialog(getActivity());
-            dialog.show();
-        });
-
+        updateWifiVisibility();
+        setWifi(null);
         initUsbDeviceIcon();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // a session may have started or ended while we were in the background
+        updateAaTile();
+    }
+
+    private void updateWifiVisibility(){
+        wifiTile_.setVisibility(settings_.advanced.enableWiFi() ? View.VISIBLE : View.GONE);
+    }
+
     private void initUsbDeviceIcon(){
-        if (usbManager_.aoapDevice() != null){
-            LibUsbDevice device = usbManager_.aoapDevice();
-            if (Log.isDebug()) Log.d(TAG, "current aoap device " + device);
-            usbIconConnection_.setImageResource(R.drawable.usb);
-            txtUsbIconConnection_.setText(device.product);
-            startUsbBtn_.setEnabled(true);
-            startUsbBtn_.setAlpha(1f);
+        LibUsbDevice device = usbManager_.aoapDevice();
+        if (Log.isDebug()) Log.d(TAG, "current aoap device " + device);
+        setUsbDevice(device != null ? device.product : null);
+    }
+
+    private void setUsbDevice(String name){
+        usbDeviceName_ = name;
+        txtUsbIconConnection_.setText(name != null ? name : getString(R.string.home_usb));
+        updateAaTile();
+    }
+
+    private void setWifi(String ssid){
+        // Android 4.2+ reports the SSID in quotes
+        if (ssid != null && ssid.length() > 1 && ssid.startsWith("\"") && ssid.endsWith("\"")) {
+            ssid = ssid.substring(1, ssid.length() - 1);
+        }
+        wifiSsid_ = ssid;
+        txtWifiIconConnection_.setText(ssid != null ? ssid : getString(R.string.home_wifi));
+        wifiTile_.setAlpha(ssid != null ? 1f : 0.5f);
+        updateAaTile();
+    }
+
+    private void updateAaTile(){
+        boolean wifi = wifiSsid_ != null && settings_.advanced.enableWiFi();
+        boolean active = ODAService.isSessionActive();
+        boolean ready = active || usbDeviceName_ != null || wifi;
+
+        aaTile_.setBackgroundResource(ready ? R.drawable.tile_ready : R.drawable.tile_idle);
+        aaLogo_.setAlpha(ready ? 1f : 0.45f);
+        aaStatus_.setTextColor(ready ? 0xFFE2F0FF : getResources().getColor(R.color.oda_text_dim));
+        if (active) {
+            aaStatus_.setText(R.string.home_aa_active);
+        } else if (usbDeviceName_ != null) {
+            aaStatus_.setText(getString(R.string.home_aa_ready, usbDeviceName_));
+        } else if (wifi) {
+            aaStatus_.setText(getString(R.string.home_aa_ready_wifi, wifiSsid_));
+        } else {
+            aaStatus_.setText(R.string.home_aa_no_phone);
         }
     }
 
@@ -154,16 +184,7 @@ public class HomeFragment extends Fragment {
         if (Log.isDebug()) Log.d(TAG, "onActivityResult " + resultCode);
         if (requestCode == MainActivity.SETTINGS_ACTIVITY_REQUEST){
 
-            if (settings_.advanced.enableWiFi()) {
-                startBtn_.setVisibility(View.VISIBLE);
-                wifiIconConnection_.setVisibility(View.VISIBLE);
-                txtWifiIconConnection_.setVisibility(View.VISIBLE);
-            } else {
-                startBtn_.setVisibility(View.GONE);
-                wifiIconConnection_.setVisibility(View.GONE);
-                txtWifiIconConnection_.setVisibility(View.GONE);
-            }
-
+            updateWifiVisibility();
             initUsbDeviceIcon();
         }
         super.onActivityResult(requestCode, resultCode, data);
@@ -199,27 +220,13 @@ public class HomeFragment extends Fragment {
         public void onReceive(Context context, Intent intent) {
             if (Log.isDebug()) Log.d(TAG, "received action " + intent.getAction());
             if (USBManager.DETACH_AOAP_DEVICE.equalsIgnoreCase(intent.getAction())){
-                usbIconConnection_.setImageResource(R.drawable.usb_dis);
-                txtUsbIconConnection_.setText("");
-                startUsbBtn_.setEnabled(false);
-                startUsbBtn_.setAlpha(0.5f);
+                setUsbDevice(null);
             } else if (USBManager.ATTACH_AOAP_DEVICE.equalsIgnoreCase(intent.getAction())){
-                LibUsbDevice device = usbManager_.aoapDevice();
-                usbIconConnection_.setImageResource(R.drawable.usb);
-                txtUsbIconConnection_.setText(device.product);
-                startUsbBtn_.setEnabled(true);
-                startUsbBtn_.setAlpha(1f);
+                initUsbDeviceIcon();
             } else if (WIFIManager.CONNECT_WIFI.equalsIgnoreCase(intent.getAction())){
-                String ssid = intent.getStringExtra(WIFIManager.EXTRA_SSID);
-                wifiIconConnection_.setImageResource(R.drawable.wifi);
-                txtWifiIconConnection_.setText(ssid);
-                startBtn_.setEnabled(true);
-                startBtn_.setAlpha(1f);
+                setWifi(intent.getStringExtra(WIFIManager.EXTRA_SSID));
             } else if (WIFIManager.DISCONNECT_WIFI.equalsIgnoreCase(intent.getAction())){
-                wifiIconConnection_.setImageResource(R.drawable.wifi_dis);
-                txtWifiIconConnection_.setText("");
-                startBtn_.setEnabled(false);
-                startBtn_.setAlpha(0.5f);
+                setWifi(null);
             }
         }
     }

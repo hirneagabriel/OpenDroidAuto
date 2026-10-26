@@ -1,8 +1,10 @@
 package it.smg.hu.manager;
 
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -14,6 +16,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import it.smg.hu.config.Settings;
+import it.smg.hu.service.ODAService;
+import it.smg.hu.ui.PlayerActivity;
+import it.smg.hu.widget.ConnectionWidget;
 import it.smg.libs.common.Log;
 import it.smg.libs.aasdk.usb.LibUsb;
 import it.smg.libs.aasdk.usb.LibUsbDevice;
@@ -64,11 +70,52 @@ public class USBManager {
         localBroadcastManager_ = LocalBroadcastManager.getInstance(ctx_);
         LibUsb.init();
         libUsb_ = LibUsb.instance();
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        ctx_.registerReceiver(usbReceiver_, filter);
+    }
+
+    private final BroadcastReceiver usbReceiver_ = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            if (device == null) {
+                return;
+            }
+
+            if (ACTION_USB_PERMISSION.equals(intent.getAction())) {
+                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                    if (Log.isInfo()) Log.i(TAG, "permission granted for " + device.getDeviceName());
+                    checkDevice(device);
+                } else {
+                    if (Log.isWarn()) Log.w(TAG, "permission denied for " + device.getDeviceName());
+                }
+            } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(intent.getAction())) {
+                // the phone's first enumeration also detaches when it switches to accessory mode; only the accessory matters
+                if (usbDevice_ != null && usbDevice_.originalDevice().getDeviceName().equals(device.getDeviceName())) {
+                    if (Log.isInfo()) Log.i(TAG, "aoap device detached");
+                    usbDevice_ = null;
+                    localBroadcastManager_.sendBroadcast(new Intent(DETACH_AOAP_DEVICE));
+                    ConnectionWidget.refresh(ctx_);
+                }
+            }
+        }
+    };
+
+    /** The phone's identity for remembering it: its USB serial, or manufacturer and model when it has none. */
+    public static String deviceId(LibUsbDevice device){
+        if (device.serial != null && !device.serial.isEmpty() && !"Unknown".equals(device.serial)) {
+            return device.serial;
+        }
+        return device.manufacter + "/" + device.product;
     }
 
     public boolean checkDevice(UsbDevice device){
         if (Log.isInfo()) Log.i(TAG, "checkDevice");
 
+        // launched by USB_DEVICE_ATTACHED the system has already granted it; otherwise ask, and continue in usbReceiver_
         boolean deviceHasPermission = usbManager_.hasPermission(device);
         if (Log.isInfo()) Log.i(TAG, "deviceHasPermission " + deviceHasPermission);
         if (!deviceHasPermission) {
@@ -76,6 +123,7 @@ public class USBManager {
             Intent i = new Intent(ACTION_USB_PERMISSION);
             PendingIntent permissionIntent = PendingIntent.getBroadcast(ctx_, 0, i, PendingIntent.FLAG_ONE_SHOT);
             usbManager_.requestPermission(device, permissionIntent);
+            return false;
         }
 
         boolean isAoap = checkAOAPDevice(device);
@@ -90,9 +138,23 @@ public class USBManager {
             Intent aoapDeviceIntent = new Intent(ATTACH_AOAP_DEVICE);
             aoapDeviceIntent.putExtra(UsbManager.EXTRA_DEVICE, device);
             localBroadcastManager_.sendBroadcast(aoapDeviceIntent);
+            ConnectionWidget.refresh(ctx_);
+
+            if (isKnownDevice() && !ODAService.isSessionActive()) {
+                if (Log.isInfo()) Log.i(TAG, "known phone, starting Android Auto");
+                Intent i = new Intent(ctx_, PlayerActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                i.putExtra("mode", ODAService.MODE_USB);
+                ctx_.startActivity(i);
+            }
         }
 
         return isAoap;
+    }
+
+    /** Whether the current accessory is a phone that has run Android Auto here before. */
+    public boolean isKnownDevice(){
+        return usbDevice_ != null && Settings.instance().connectivity.isKnownDevice(deviceId(usbDevice_));
     }
 
     public LibUsbDevice aoapDevice(){
@@ -123,7 +185,7 @@ public class USBManager {
     public void searchForAoapDevice(){
         if (usbManager_.getDeviceList() != null) {
             for(UsbDevice dev : usbManager_.getDeviceList().values()){
-                if (checkAOAPDevice(dev)){
+                if (checkAOAPDevice(dev) && usbManager_.hasPermission(dev)){
                     usbDevice_ = libUsb_.createDevice(dev, usbManager_);
                     return;
                 }

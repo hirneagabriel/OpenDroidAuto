@@ -1,171 +1,172 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Home: colour-coded tiles over the car's wallpaper, like the head unit's own home screen -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F1F1F1">
+    android:background="@drawable/wallpaper_scrim"
+    android:orientation="vertical">
 
-    <RelativeLayout
-        android:id="@+id/logos"
+    <include layout="@layout/title_bar" />
+
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_marginTop="100dp">
-        <!--
-                    <ImageView
-                        android:id="@+id/androidIcon"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_centerInParent="false"
-                        android:layout_marginRight="20dp"
-                        android:layout_toLeftOf="@id/dotsIcon"
-                        android:contentDescription="@string/usb_connection_icon"
-                        android:src="@drawable/android" />
-        -->
-        <ImageView
-            android:id="@+id/dotsIcon"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:layout_centerHorizontal="true"
-            android:contentDescription="@string/usb_connection_icon"
-            android:src="@drawable/logo" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:padding="11dp">
 
-        <!--
-                    <ImageView
-                        android:id="@+id/carIcon"
-                        android:layout_width="100dp"
-                        android:layout_height="wrap_content"
-                        android:layout_centerHorizontal="true"
-                        android:layout_toRightOf="@id/dotsIcon"
-                        android:layout_marginLeft="20dp"
-                        android:contentDescription="@string/usb_connection_icon"
-                        android:src="@drawable/logo" />
-        -->
-    </RelativeLayout>
-    <!--
-            <ProgressBar
-                android:id="@+id/progressbar"
-                android:layout_width="wrap_content"
+        <!-- Android Auto: grey until a phone is ready -->
+        <FrameLayout
+            android:id="@+id/aaTile"
+            style="@style/Tile"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="5"
+            android:background="@drawable/tile_idle">
+
+            <ImageView
+                android:id="@+id/aaLogo"
+                android:layout_width="150dp"
+                android:layout_height="130dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="40dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/logo" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:layout_centerHorizontal="true" />
-    -->
-    <TextView
-        android:id="@+id/message"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/logos"
-        android:layout_centerHorizontal="true"
-        android:gravity="center"
-        android:text="Connect your phone"
-        android:textColor="#039BE5"
-        android:textSize="20dp" />
+                android:layout_gravity="bottom"
+                android:orientation="vertical"
+                android:paddingBottom="12dp"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp">
 
-    <LinearLayout
-        android:id="@+id/usbIconLayout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:layout_marginBottom="20dp"
-        android:layout_above="@id/settingsBtn">
+                <TextView
+                    style="@style/TileText"
+                    android:text="@string/home_aa_title"
+                    android:textSize="40dp"
+                    android:textStyle="bold" />
 
-        <ImageView
-            android:gravity="center_horizontal"
-            android:id="@+id/usbIcon"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:layout_marginBottom="2dp"
-            android:contentDescription="@string/usb_connection_icon"
-            android:src="@drawable/usb_dis" />
+                <TextView
+                    android:id="@+id/aaStatus"
+                    style="@style/TileText"
+                    android:text="@string/home_aa_no_phone"
+                    android:textColor="@color/oda_text_dim"
+                    android:textSize="19dp" />
+            </LinearLayout>
+        </FrameLayout>
 
-        <TextView
-            android:id="@+id/txtUsbIcon"
-            android:layout_width="50dp"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:textColor="#039BE5"/>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="4"
+            android:orientation="vertical">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <!-- tap to pick another USB device -->
+                <FrameLayout
+                    android:id="@+id/usbTile"
+                    style="@style/Tile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_glass">
+
+                    <ImageView
+                        android:id="@+id/usbIcon"
+                        style="@style/TileIcon"
+                        android:src="@drawable/usb"
+                        android:tint="@color/oda_tint_usb" />
+
+                    <TextView
+                        android:id="@+id/txtUsbIcon"
+                        style="@style/TileLabel"
+                        android:text="@string/home_usb" />
+
+                    <View
+                        style="@style/TileEdge"
+                        android:background="@color/oda_tint_usb" />
+                </FrameLayout>
+
+                <!-- debug only (Advanced settings): start over Wi-Fi -->
+                <FrameLayout
+                    android:id="@+id/wifiTile"
+                    style="@style/Tile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_glass">
+
+                    <ImageView
+                        android:id="@+id/wifiIcon"
+                        style="@style/TileIcon"
+                        android:src="@drawable/wifi"
+                        android:tint="@color/oda_tint_wifi" />
+
+                    <TextView
+                        android:id="@+id/txtWifiIcon"
+                        style="@style/TileLabel"
+                        android:text="@string/home_wifi" />
+
+                    <View
+                        style="@style/TileEdge"
+                        android:background="@color/oda_tint_wifi" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/settingsTile"
+                    style="@style/Tile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_glass">
+
+                    <ImageView
+                        style="@style/TileIcon"
+                        android:src="@drawable/advanced_settings"
+                        android:tint="@color/oda_tint_settings" />
+
+                    <TextView
+                        style="@style/TileLabel"
+                        android:text="@string/settings" />
+
+                    <View
+                        style="@style/TileEdge"
+                        android:background="@color/oda_tint_settings" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/exitTile"
+                    style="@style/Tile"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_glass">
+
+                    <ImageView
+                        style="@style/TileIcon"
+                        android:src="@drawable/ic_power"
+                        android:tint="@color/oda_text_dim" />
+
+                    <TextView
+                        style="@style/TileLabel"
+                        android:text="@string/exit" />
+                </FrameLayout>
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/wifiIconLayout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:layout_toRightOf="@id/usbIconLayout"
-        android:layout_marginBottom="20dp"
-        android:layout_above="@id/settingsBtn">
-
-        <ImageView
-            android:gravity="center_horizontal"
-            android:id="@+id/wifiIcon"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:layout_marginBottom="2dp"
-            android:contentDescription="@string/wifi_connection_icon"
-            android:src="@drawable/wifi_dis" />
-
-        <TextView
-            android:id="@+id/txtWifiIcon"
-            android:layout_width="50dp"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:textColor="#039BE5"/>
-
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/settingsBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_marginStart="20dp"
-        android:layout_marginLeft="20dp"
-        android:layout_marginBottom="20dp"
-        android:background="#039BE5"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
-        android:text="@string/settings"
-        android:textColor="#FFF" />
-
-    <Button
-        android:id="@+id/startUsbBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="20dp"
-        android:background="#039BE5"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
-        android:text="@string/start_usb"
-        android:textColor="#FFF" />
-
-    <Button
-        android:id="@+id/startBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/startUsbBtn"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="10dp"
-        android:background="#039BE5"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
-        android:text="@string/start"
-        android:textColor="#FFF" />
-
-    <Button
-        android:id="@+id/exitBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentBottom="true"
-        android:layout_marginEnd="20dp"
-        android:layout_marginRight="20dp"
-        android:layout_marginBottom="20dp"
-        android:background="#039BE5"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
-        android:text="@string/exit"
-        android:textColor="#FFF" />
-</RelativeLayout>
+</LinearLayout>

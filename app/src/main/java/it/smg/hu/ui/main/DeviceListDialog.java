@@ -1,59 +1,61 @@
 package it.smg.hu.ui.main;
 
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
+import android.view.ViewGroup;
+import android.widget.TextView;
+
+import java.util.List;
 
 import it.smg.hu.R;
 import it.smg.hu.manager.USBManager;
+import it.smg.hu.ui.Fonts;
 import it.smg.libs.aasdk.usb.LibUsbDevice;
 import it.smg.libs.common.Log;
 
-public class DeviceListDialog extends AlertDialog {
+/** Lists the plugged-in USB devices; tapping one switches it to Android Auto. */
+public class DeviceListDialog extends Dialog {
 
     private static final String TAG = "DeviceListDialog";
 
-    private USBManager usbManager_;
-
     protected DeviceListDialog(Context context) {
-        super(context);
+        super(context, R.style.OdaDialog);
 
-        setTitle("Select USB Device");
+        setContentView(R.layout.usb_devices_dialog);
+        findViewById(R.id.usb_devices_close).setOnClickListener(v -> dismiss());
 
-        LayoutInflater inflater = getLayoutInflater();
-        View listView = inflater.inflate(R.layout.usb_devices_dialog, null);
-        setView(listView);
-        RadioGroup group = listView.findViewById(R.id.usb_devices_list);
+        USBManager usbManager = USBManager.instance();
+        LibUsbDevice currentAOAP = usbManager.aoapDevice();
+        List<LibUsbDevice> devices = usbManager.connectedDevices();
 
-        usbManager_ = USBManager.instance();
+        ViewGroup list = findViewById(R.id.usb_devices_list);
+        findViewById(R.id.usb_devices_empty).setVisibility(devices.isEmpty() ? View.VISIBLE : View.GONE);
+        list.setVisibility(devices.isEmpty() ? View.GONE : View.VISIBLE);
 
-        int i = 0;
-        for (LibUsbDevice d : usbManager_.connectedDevices()){
-            RadioButton b = new RadioButton(getContext());
-            b.setText(d.product);
-            b.setId(i);
-            LibUsbDevice currentAOAP = usbManager_.aoapDevice();
-            if (currentAOAP != null && d.equals(currentAOAP)){
-                b.setEnabled(false);
-                b.setSelected(true);
-            }
-            b.setTag(d);
-            b.setOnClickListener(v1 -> {
-                LibUsbDevice dev = (LibUsbDevice) v1.getTag();
-                if (Log.isDebug()) Log.d(TAG, "selected device: " + dev);
-                if (currentAOAP != null && dev.equals(currentAOAP)) {
+        LayoutInflater inflater = LayoutInflater.from(getContext());
+        for (LibUsbDevice d : devices){
+            View row = inflater.inflate(R.layout.usb_device_row, list, false);
+            ((TextView) row.findViewById(R.id.usb_device_name)).setText(d.product);
+            ((TextView) row.findViewById(R.id.usb_device_maker)).setText(d.manufacter);
+
+            // connectedDevices() makes new objects, so compare the USB device behind them
+            boolean inUse = currentAOAP != null
+                    && currentAOAP.originalDevice().getDeviceName().equals(d.originalDevice().getDeviceName());
+            row.findViewById(R.id.usb_device_in_use).setVisibility(inUse ? View.VISIBLE : View.GONE);
+            row.setOnClickListener(v -> {
+                if (inUse) {
                     if (Log.isDebug()) Log.d(TAG, "the device selected is already the current device");
-                } else {
-                    usbManager_.checkDevice(dev.originalDevice());
-                    dismiss();
+                    return;
                 }
+                if (Log.isDebug()) Log.d(TAG, "selected device: " + d);
+                usbManager.checkDevice(d.originalDevice());
+                dismiss();
             });
-            group.addView(b);
-            i++;
+            list.addView(row);
         }
-    }
 
+        Fonts.apply(findViewById(android.R.id.content));
+    }
 }

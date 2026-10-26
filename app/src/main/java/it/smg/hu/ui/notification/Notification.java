@@ -14,6 +14,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import com.google.android.material.behavior.SwipeDismissBehavior;
 
 import it.smg.hu.R;
+import it.smg.hu.ui.Fonts;
 import it.smg.libs.common.Log;
 
 abstract class Notification implements INotification {
@@ -106,6 +107,7 @@ abstract class Notification implements INotification {
             if (dialog_ == null) {
                 dialog_ = new Dialog(ctx_, R.style.notificationPopup);
                 dialog_.setContentView(layoutResId_);
+                Fonts.apply(dialog_.findViewById(android.R.id.content));
                 dialog_.getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
                 dialog_.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
                 dialog_.getWindow().getAttributes().windowAnimations = R.style.animation;

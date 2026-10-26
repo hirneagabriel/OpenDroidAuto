@@ -1,10 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RadioGroup xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/usb_devices_list"
-    android:layout_width="match_parent"
+<!-- USB device picker: which plugged-in device to switch to Android Auto -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="520dp"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:background="@drawable/popup_bg"
+    android:orientation="vertical"
+    android:padding="8dp">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="8dp"
+        android:paddingLeft="12dp"
+        android:paddingTop="4dp">
 
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/usb_devices_title"
+            android:textColor="@color/oda_text"
+            android:textSize="22dp"
+            android:textStyle="bold" />
 
-</RadioGroup>
+        <Button
+            android:id="@+id/usb_devices_close"
+            style="@style/SettingsButton"
+            android:minWidth="96dp"
+            android:text="@string/usb_devices_close" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/usb_devices_empty"
+        style="@style/SettingsSummary"
+        android:paddingBottom="16dp"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingTop="8dp"
+        android:text="@string/usb_devices_empty"
+        android:textSize="17dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/usb_devices_list"
+        style="@style/SettingsSection" />
+</LinearLayout>

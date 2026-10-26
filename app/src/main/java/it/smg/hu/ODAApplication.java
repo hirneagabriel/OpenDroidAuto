@@ -12,6 +12,7 @@ import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 
 import it.smg.hu.ui.notification.AppBadge;
+import it.smg.hu.widget.ConnectionWidget;
 import it.smg.libs.aasdk.Runtime;
 import it.smg.libs.common.Log;
 
@@ -56,6 +57,8 @@ public class ODAApplication extends MultiDexApplication {
         WIFIManager.init(getApplicationContext());
         AppBadge.init(getApplicationContext());
         ResourceMonitor.init(getApplicationContext());
+        // a widget left showing the last process's state
+        ConnectionWidget.refresh(getApplicationContext());
         if (Settings.instance().advanced.hondaIntegrationEnabled()) {
             HondaConnectManager.init(getApplicationContext());
         }

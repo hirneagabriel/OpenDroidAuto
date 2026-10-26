@@ -19,6 +19,7 @@ import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 import it.smg.hu.projection.InputDevice;
 import it.smg.hu.ui.notification.NotificationFactory;
+import it.smg.hu.widget.ConnectionWidget;
 import it.smg.libs.aasdk.tcp.TCPConnectException;
 import it.smg.libs.common.Log;
 import it.smg.libs.aasdk.service.AndroidAutoEntity;
@@ -54,6 +55,13 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 
     private boolean isRunning_;
 
+    // for the widget and USB auto-start, which have no binding to the service
+    private static volatile boolean sessionActive_;
+
+    public static boolean isSessionActive(){
+        return sessionActive_;
+    }
+
     public ODAService() {}
 
     @Override
@@ -85,6 +93,8 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
                         if (Log.isInfo()) Log.i(TAG, "device opened");
                         androidAutoEntity_ = AndroidAutoEntityFactory.create(this, device, surfaceView, keyHolder);
                         androidAutoEntity_.start(this);
+                        Settings.instance().connectivity.rememberDevice(USBManager.deviceId(device));
+                        setSessionActive(true);
                     } else {
                         Log.e(TAG, "Error in open usb device");
                         onAndroidAutoQuitOnError("USB OPEN DEVICE", -1);
@@ -115,6 +125,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
                     TCPEndpoint tcpEndpoint = new TCPEndpoint(ipAddress);
                     androidAutoEntity_ = AndroidAutoEntityFactory.create(this, tcpEndpoint, surfaceView, keyHolder);
                     androidAutoEntity_.start(this);
+                    setSessionActive(true);
                 }
                 if (Log.isInfo()) Log.i(TAG, "start wifi thead completed");
             } catch (TCPConnectException e){
@@ -163,12 +174,18 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
         }
 
         startThread_ = null;
+        setSessionActive(false);
 
         Intent stopIntent = new Intent(ODAService.STOP_ACTION);
         localBroadcastManager_.sendBroadcast(stopIntent);
 
         Intent service = new Intent(this, ODAService.class);
         stopService(service);
+    }
+
+    private void setSessionActive(boolean active){
+        sessionActive_ = active;
+        mainHandler_.post(() -> ConnectionWidget.refresh(this));
     }
 
     @Override

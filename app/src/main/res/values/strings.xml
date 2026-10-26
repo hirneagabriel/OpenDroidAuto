@@ -1,28 +1,28 @@
 <resources>
 	<string name="car_settings">Car Settings</string>
 	<string name="car_settings_hu_name">Name</string>
-	<string name="car_settings_model">Model</string>
+	<string name="car_settings_model">Car model</string>
 	<string name="car_settings_year">Year</string>
-	<string name="car_settings_hu_make">HU Maker</string>
-	<string name="car_settings_hu_model">HU Model</string>
-	<string name="car_settings_sw_build">SW Build</string>
-	<string name="car_settings_sw_version">SW Version</string>
-	<string name="car_settings_play_media_during_vr">Play Native Media During VR</string>
-	<string name="car_settings_hide_clock">Hide Clock</string>
-	<string name="car_settings_left_drive">Left Drive</string>
+	<string name="car_settings_hu_make">Head unit maker</string>
+	<string name="car_settings_hu_model">Head unit model</string>
+	<string name="car_settings_sw_build">Software build</string>
+	<string name="car_settings_sw_version">Software version</string>
+	<string name="car_settings_play_media_during_vr">Keep playing media during voice commands</string>
+	<string name="car_settings_hide_clock">Hide the Android Auto clock</string>
+	<string name="car_settings_left_drive">Left-hand drive</string>
 	<string name="car_settings_aa_wifi">Use Android Auto Wireless</string>
 
 	<string name="video_settings_sw_dec">Use software decoder (can be slow)</string>
 	<string name="video_settings">Video Settings</string>
 	<string name="video_settings_resolution">Resolution</string>
-	<string name="video_settings_fps">FPS</string>
-	<string name="video_settings_decoder_low_latency">Low-latency video decoding (takes effect on next connection)</string>
-	<string name="video_settings_dpi">DPI</string>
-	<string name="video_settings_margin">Margin</string>
-	<string name="video_settings_nightmode">Night Mode</string>
-	<string name="video_show_media_notification">Show Media notification when app is in background</string>
-	<string name="video_show_navigation_notification">Show Navigation notification when app is in background</string>
-	<string name="video_show_app_badge">Show an application badge when app is in background</string>
+	<string name="video_settings_fps">Frame rate</string>
+	<string name="video_settings_decoder_low_latency">Low-latency video decoding</string>
+	<string name="video_settings_dpi">Density (DPI)</string>
+	<string name="video_settings_margin">Margins</string>
+	<string name="video_settings_nightmode">Night mode</string>
+	<string name="video_show_media_notification">Media popup</string>
+	<string name="video_show_navigation_notification">Navigation popup</string>
+	<string name="video_show_app_badge">App badge</string>
 
 	<string name="enable_media_channel_settings">Enable Media Audio Channel</string>
 	<string name="enable_speech_channel_settings">Enable Speech Audio Channel</string>
@@ -37,34 +37,55 @@
 	<string name="input_settings_mic_source">Source Type</string>
 
 	<string name="conn_settings">Connectivity Settings</string>
-	<string name="conn_settings_enableAd2p">Enable AD2P</string>
-	<string name="conn_settings_enableHfp">Enable HFP</string>
+	<string name="conn_settings_enableAd2p">Bluetooth audio (A2DP)</string>
+	<string name="conn_settings_enableHfp">Bluetooth calls (HFP)</string>
 
 	<string name="keymap_steeringwheel_desc">Steering wheel</string>
-	<string name="keymap_settings_btnleft">Left</string>
-	<string name="keymap_settings_btnright">Right</string>
-	<string name="keymap_settings_btnsource">Source</string>
-	<string name="keymap_settings_btnplus">+</string>
-	<string name="keymap_settings_btnminus">-</string>
+	<string name="keymap_settings_section">Steering wheel buttons</string>
+	<string name="keymap_settings_hint">To teach the app a button, tap Learn and press that button on the wheel within 5 seconds. Long-press Learn to forget it.</string>
+	<string name="keymap_settings_hint_no_honda">Learning buttons needs Honda integration (Car tab), because the car only sends the buttons through it.</string>
+	<string name="keymap_settings_learn">Learn</string>
+	<string name="keymap_settings_code">Key code %1$d</string>
+	<string name="keymap_settings_code_none">Not learned yet</string>
+	<string name="keymap_settings_code_waiting">Press the button on the wheel now</string>
+	<string name="keymap_settings_btnleft">Left button</string>
+	<string name="keymap_settings_btnright">Right button</string>
+	<string name="keymap_settings_btnsource">Source button</string>
+	<string name="keymap_settings_btnplus">+ button</string>
+	<string name="keymap_settings_btnminus">− button</string>
 
 	<string name="audio_settings">Audio Settings</string>
 
 	<string name="advanced_settings">Advanced</string>
-	<string name="advanced_settings_logDir">External log directory</string>
-	<string name="advanced_settings_enabledebug">Enable external log</string>
+	<string name="advanced_settings_logDir">Log folder</string>
+	<string name="advanced_settings_enabledebug">Write the log to a file</string>
 	<string name="advanced_settings_enabletoast">Enable Toast log</string>
-	<string name="advanced_settings_enablewifi">Enable wifi (only for debug)</string>
-	<string name="advanced_settings_resource_monitor">Log CPU/memory usage to log dir</string>
-	<string name="advanced_settings_enablehondaintegration">Enable Honda Integration</string>
-	<string name="advanced_settings_enablehondamicvr">Enable Honda Mic VR Bridge</string>
-	<string name="advanced_settings_logLevel">Log Level</string>
-	<string name="advanced_settings_logProtocol">Enable Log Protocol (logLevel must be verbose)</string>
-	<string name="advanced_settings_threads">Threads num</string>
-	<string name="advanced_settings_modeMgrAudioIdx">Mode mgr audio idx</string>
-	<string name="advanced_settings_steeringWheelIdx">SteeringWheel idx</string>
-	<string name="advanced_settings_swmode">SteeringWheel Key Mode</string>
+	<string name="advanced_settings_enablewifi">Wi-Fi connection</string>
+	<string name="advanced_settings_resource_monitor">Log CPU and memory use</string>
+	<string name="advanced_settings_enablehondaintegration">Honda integration</string>
+	<string name="advanced_settings_enablehondamicvr">Use the car\'s microphone for voice commands</string>
+	<string name="advanced_settings_logLevel">Log level</string>
+	<string name="advanced_settings_logProtocol">Log protocol messages</string>
+	<string name="advanced_settings_threads">Protocol threads</string>
+	<string name="advanced_settings_modeMgrAudioIdx">Audio source</string>
+	<string name="advanced_settings_steeringWheelIdx">Steering menu slot</string>
+	<string name="advanced_settings_swmode">How the buttons reach the app</string>
 
+	<string name="app_name">OpenDroidAuto</string>
+	<string name="back">Back</string>
+	<string name="home_aa_title">Android Auto</string>
+	<string name="home_aa_no_phone">Plug in your phone with a USB cable</string>
+	<string name="home_aa_ready">%1$s is ready</string>
+	<string name="home_aa_ready_wifi">Ready over Wi-Fi (%1$s)</string>
+	<string name="home_aa_active">Running</string>
+	<string name="home_usb">USB</string>
+	<string name="home_wifi">Wi-Fi</string>
 	<string name="settings">Settings</string>
+	<string name="settings_tab_car">Car</string>
+	<string name="settings_tab_video">Display</string>
+	<string name="settings_tab_conn">Connection</string>
+	<string name="settings_tab_keymap">Steering keys</string>
+	<string name="settings_tab_advanced">Developer</string>
 	<string name="exit">Exit</string>
 	<string name="start">Start WiFi</string>
 	<string name="start_usb">Start</string>
@@ -78,7 +99,12 @@
 
 	<string name="main_notification_title">Android Auto Mode</string>
 	<string name="main_notification_content">Android Auto Mode</string>
-	<string name="popup_notification_content">Android Auto available, click to connect</string>
+	<string name="popup_notification_content">Phone connected</string>
+	<string name="popup_notification_hint">Tap to start Android Auto. After that it starts by itself.</string>
+	<string name="usb_devices_title">USB devices</string>
+	<string name="usb_devices_close">Close</string>
+	<string name="usb_devices_empty">No USB devices found. Plug in your phone with a USB cable.</string>
+	<string name="usb_devices_in_use">In use</string>
 
 	<string name="media_status_update_message">Media Status Update: source %1$s, status %2$s, progress %3$d</string>
 <!--	<string name="media_metadata_update_message">Media Metadata Update: track %1$s, album: %2$s, artist %3$s, length %4$d</string>-->
@@ -86,6 +112,12 @@
 	<!-- Widgets -->
 	<string name="widget_start_label_no_usb">No USB</string>
 	<string name="widget_start_label">Start</string>
+
+	<string name="widget_connection_title">Android Auto</string>
+	<string name="widget_connection_no_phone">No phone</string>
+	<string name="widget_connection_active">Running</string>
+	<string name="widget_connection_preview_text">Android Auto</string>
+	<string name="widget_connection_small_preview_text">Android Auto (small)</string>
 
 	<string name="widget_exit_label">Exit</string>
 	<string name="widget_exit_preview_text">Exit</string>
@@ -99,5 +131,45 @@
 	<string name="protocol_error">Protocol error. Native AA error: %1$d</string>
 	<string name="wifi_transfer_error">Wifi comunication error. Native AA error: %1$d</string>
 	<string name="generic_error">Generic error. Native AA error: %1$d</string>
+
+
+	<!-- settings pages -->
+	<string name="settings_section_phones">Phones</string>
+	<string name="conn_settings_known_devices">Remembered phones</string>
+	<string name="conn_settings_forget">Forget all</string>
+	<string name="settings_section_bluetooth">Bluetooth</string>
+	<string name="settings_section_wifi">Wi-Fi</string>
+	<string name="advanced_settings_enablewifi_summary">For debugging: shows a Wi-Fi tile that connects to the phone\'s head unit server</string>
+	<string name="settings_section_picture">Picture</string>
+	<string name="video_settings_dpi_summary">Higher makes text and icons bigger</string>
+	<string name="video_settings_margin_summary">Black border in pixels, as width,height</string>
+	<string name="video_settings_decoder_low_latency_summary">Takes effect on the next connection</string>
+	<string name="settings_section_daynight">Day and night</string>
+	<string name="video_settings_nightmode_summary">What switches Android Auto to its dark theme</string>
+	<string name="settings_section_background">While in the background</string>
+	<string name="video_show_app_badge_summary">A small button to return to Android Auto</string>
+	<string name="settings_section_driving">Driving</string>
+	<string name="settings_section_identity">Head unit identity</string>
+	<string name="settings_section_integration">Honda integration</string>
+	<string name="advanced_settings_enablehondaintegration_summary">Use the car\'s audio, steering buttons and system services. Turn off when testing outside the car</string>
+	<string name="settings_section_steering">Steering buttons</string>
+	<string name="advanced_settings_steeringWheelIdx_summary">Which slot of the car\'s steering menu the app takes over: 260 Menu (default), 258 Source, 259 Display, 265 Launcher</string>
+	<string name="settings_section_audio">Car audio</string>
+	<string name="advanced_settings_modeMgrAudioIdx_summary">Which car audio source Android Auto plays as: 213 Third-party app (default), 199 USB audio, 197 Bluetooth</string>
+	<string name="settings_section_logging">Logging</string>
+	<string name="advanced_settings_logProtocol_summary">Needs log level Verbose</string>
+	<string name="advanced_settings_resource_monitor_summary">Writes stats to the log folder every 5 seconds</string>
+	<string name="settings_section_performance">Performance</string>
+	<string name="advanced_settings_threads_summary">Takes effect on the next connection</string>
+	<string name="conn_settings_known_devices_none">None yet: a phone is remembered the first time Android Auto starts on it</string>
+	<plurals name="conn_settings_known_devices_summary">
+		<item quantity="one">%1$d phone starts Android Auto as soon as it\'s plugged in</item>
+		<item quantity="other">%1$d phones start Android Auto as soon as they\'re plugged in</item>
+	</plurals>
+
+	<!-- settings pages -->
+	<string name="settings_section_identity_summary">What the phone is told about this car</string>
+
+	<!-- settings pages -->
 
 </resources>

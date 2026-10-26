@@ -1,7 +1,9 @@
 package it.smg.hu.ui.settings;
 
 import android.content.Context;
+import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
@@ -16,12 +18,37 @@ import java.util.concurrent.Callable;
 
 import it.smg.hu.R;
 import it.smg.hu.config.Settings;
+import it.smg.hu.ui.Fonts;
 import it.smg.libs.common.Log;
 
 public abstract class BaseSettingsFragment extends Fragment {
     protected Settings settings;
 
     protected abstract String tag();
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        Fonts.apply(view);
+    }
+
+    /** Adapter for a settings dropdown, in the app's typeface. */
+    protected ArrayAdapter<CharSequence> createAdapter(int data){
+        ArrayAdapter<CharSequence> adapter = new ArrayAdapter<CharSequence>(getContext(), R.layout.spinner_item,
+                getResources().getTextArray(data)) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                return Fonts.apply(super.getView(position, convertView, parent));
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                return Fonts.apply(super.getDropDownView(position, convertView, parent));
+            }
+        };
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        return adapter;
+    }
 
     protected void initEditText(EditText editText, Settings.Base base, String settingsKey, String defaultValue){
         initEditText(editText, base, settingsKey, defaultValue, null);
@@ -36,7 +63,12 @@ public abstract class BaseSettingsFragment extends Fragment {
 
         editText.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE){
-                base.set(settingsKey, Integer.parseInt(v.getText().toString()));
+                try {
+                    base.set(settingsKey, Integer.parseInt(v.getText().toString().trim()));
+                } catch (NumberFormatException e) {
+                    // empty or not a number: keep the saved value
+                    v.setText(String.valueOf(base.get(settingsKey, defaultValue)));
+                }
 
                 InputMethodManager imm = (InputMethodManager) v.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
                 imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
@@ -81,6 +113,11 @@ public abstract class BaseSettingsFragment extends Fragment {
     }
 
     protected void initCheckBox(CheckBox checkBox, Settings.Base base, String settingsKey, boolean defaultValue, Callable<Void> custonCheck){
+        // rows with a hint hold a bare switch; tapping anywhere on the row flips it
+        View row = (View) checkBox.getParent();
+        if ("toggle_row".equals(row.getTag())) {
+            row.setOnClickListener(v -> checkBox.toggle());
+        }
         checkBox.setChecked(base.get(settingsKey, defaultValue));
         checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             base.set(settingsKey, isChecked);
@@ -103,8 +140,7 @@ public abstract class BaseSettingsFragment extends Fragment {
     }
 
     protected void initSpinner(Spinner spinner, int data, int dataValue, Settings.Base base, String settingsKey, int defaultValue, Callable<Void> custonCheck){
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(), data, R.layout.spinner_item);
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        ArrayAdapter<CharSequence> adapter = createAdapter(data);
         spinner.setAdapter(adapter);
 
         int value = base.get(settingsKey, defaultValue);
@@ -146,8 +182,7 @@ public abstract class BaseSettingsFragment extends Fragment {
     }
 
     protected void initSpinner(Spinner spinner, int data, int dataValue, Settings.Base base, String settingsKey, String defaultValue, Callable<Void> custonCheck){
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(), data, R.layout.spinner_item);
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        ArrayAdapter<CharSequence> adapter = createAdapter(data);
         spinner.setAdapter(adapter);
 
         String value = base.get(settingsKey, defaultValue);

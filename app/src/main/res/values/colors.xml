@@ -8,4 +8,16 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
+
+    <!-- taken from the head unit's own UI: the Android Auto tile turns its Audio-tile blue when a phone is ready -->
+    <color name="oda_text">#FFF2F5F8</color>
+    <color name="oda_text_dim">#FF9DAEBF</color>
+    <color name="oda_accent">#FF3A8FE0</color>
+    <color name="oda_accent_light">#FF8CC8FF</color>
+    <color name="oda_bar">#E60E1116</color>
+    <color name="oda_panel">#C81B232C</color>
+    <!-- secondary tiles are glass; their category shows only in the icon and a thin bottom edge -->
+    <color name="oda_tint_usb">#FF4FD0E0</color>
+    <color name="oda_tint_wifi">#FF8BD86A</color>
+    <color name="oda_tint_settings">#FFB08CF0</color>
 </resources>

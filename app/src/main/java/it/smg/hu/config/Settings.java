@@ -8,6 +8,9 @@ import android.preference.PreferenceManager;
 
 import androidx.annotation.Keep;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import it.smg.hu.util.DeviceUtils;
 import it.smg.libs.common.ILog;
 import it.smg.libs.aasdk.configuration.ICarConfiguration;
@@ -254,7 +257,7 @@ public class Settings {
         public final static String VIDEO_NIGHT_MODE_DEFAULT_VALUE = ""; //IDayNightSensor.TIME_GPS;
         public final static boolean VIDEO_SHOW_MEDIA_NOTIFICATION_DEFAULT_VALUE = true;
         public final static boolean VIDEO_SHOW_NAVIGATION_NOTIFICATION_DEFAULT_VALUE = true;
-        public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = true;
+        public final static boolean VIDEO_SHOW_APP_BADGE_DEFAULT_VALUE = false; // the home screen widget covers getting back to Android Auto
         public final static boolean VIDEO_DECODER_LOW_LATENCY_DEFAULT_VALUE = true;
 
         public int resolution(){
@@ -343,6 +346,24 @@ public class Settings {
             SP.edit().putBoolean(CONN_ENABLED_HFP, value).apply();
         }
 
+        // phones (USB serial numbers) that connected before; they start Android Auto as soon as they're plugged in
+        public final static String CONN_KNOWN_DEVICES = "conn_known_devices";
+
+        public boolean isKnownDevice(String serial){
+            return SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()).contains(serial);
+        }
+        public void rememberDevice(String serial){
+            Set<String> devices = new HashSet<>(SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()));
+            if (devices.add(serial)) {
+                SP.edit().putStringSet(CONN_KNOWN_DEVICES, devices).apply();
+            }
+        }
+        public int knownDeviceCount(){
+            return SP.getStringSet(CONN_KNOWN_DEVICES, new HashSet<String>()).size();
+        }
+        public void forgetDevices(){
+            SP.edit().remove(CONN_KNOWN_DEVICES).apply();
+        }
 
     }
     public class Audio extends Base {

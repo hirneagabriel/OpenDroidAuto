@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto with a phone ready: the blue of the car's own Audio tile -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:endColor="#EB16508E"
+        android:startColor="#EB3C93E2" />
+    <stroke
+        android:width="1dp"
+        android:color="#90BFE0FF" />
+    <corners android:radius="2dp" />
+</shape>

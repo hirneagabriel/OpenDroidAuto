@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- dropdown: the value as plain text with a small arrow after it (spinner_item leaves room), lit while pressed -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <selector>
+            <item android:state_pressed="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="#30FFFFFF" />
+                    <corners android:radius="3dp" />
+                </shape>
+            </item>
+            <item android:drawable="@android:color/transparent" />
+        </selector>
+    </item>
+    <item android:right="4dp">
+        <bitmap
+            android:gravity="right|center_vertical"
+            android:src="@drawable/ic_dropdown" />
+    </item>
+</layer-list>
