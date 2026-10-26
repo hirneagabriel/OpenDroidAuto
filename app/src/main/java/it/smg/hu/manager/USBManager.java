@@ -14,6 +14,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 import it.smg.hu.config.Settings;
@@ -159,8 +160,8 @@ public class USBManager {
 
     public LibUsbDevice aoapDevice(){
         // the detach broadcast can be missed (seen on the car), so check the phone is still plugged in
-        if (usbDevice_ != null && usbManager_.getDeviceList() != null
-                && !usbManager_.getDeviceList().containsKey(usbDevice_.originalDevice().getDeviceName())) {
+        HashMap<String, UsbDevice> attached = usbDevice_ != null ? usbManager_.getDeviceList() : null;
+        if (attached != null && !attached.containsKey(usbDevice_.originalDevice().getDeviceName())) {
             if (Log.isInfo()) Log.i(TAG, "aoap device no longer attached");
             usbDevice_ = null;
             localBroadcastManager_.sendBroadcast(new Intent(DETACH_AOAP_DEVICE));

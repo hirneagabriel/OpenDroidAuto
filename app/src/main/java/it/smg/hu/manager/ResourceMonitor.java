@@ -17,10 +17,12 @@ import android.util.DisplayMetrics;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -71,6 +73,9 @@ public class ResourceMonitor {
     private final SimpleDateFormat timeFormat_ = new SimpleDateFormat("HH:mm:ss", Locale.US);
 
     private HandlerThread thread_;
+    // reused for every /proc stat file read on the sampling thread (stat lines are well under 1 KB)
+    private final byte[] statBuf_ = new byte[1024];
+    private static final Charset US_ASCII = Charset.forName("US-ASCII");
     private Handler handler_;
     private PrintWriter csv_;
     private File outputDir_;
@@ -448,19 +453,13 @@ public class ResourceMonitor {
     }
 
     /** utime + stime per process, keyed by "pid:name". */
-    private static Map<String, Long> processJiffies(){
+    private Map<String, Long> processJiffies(){
         Map<String, Long> result = new HashMap<>();
-        File[] procs = new File("/proc").listFiles();
-        if (procs == null) return result;
-        for (File proc : procs){
-            String pid = proc.getName();
+        String[] pids = new File("/proc").list();
+        if (pids == null) return result;
+        for (String pid : pids){
             if (pid.isEmpty() || !Character.isDigit(pid.charAt(0))) continue;
-            String stat = readFirstLine(proc.getPath() + "/stat");
-            if (stat == null) continue;
-            try {
-                String name = stat.substring(stat.indexOf('(') + 1, stat.lastIndexOf(')'));
-                result.put(pid + ":" + name, procJiffies(proc.getPath() + "/stat"));
-            } catch (RuntimeException ignored) {}
+            putStat(result, pid, "/proc/" + pid + "/stat");
         }
         return result;
     }
@@ -469,13 +468,76 @@ public class ResourceMonitor {
         return String.format(Locale.US, "%.1f", 100.0 * jiffies / elapsedJiffies);
     }
 
-    /** utime + stime from a /proc/.../stat file; the comm field may contain spaces, so parse after the last ')'. */
-    private static long procJiffies(String statPath){
-        String stat = readFirstLine(statPath);
-        if (stat == null) return 0;
-        String[] f = stat.substring(stat.lastIndexOf(')') + 2).split(" ");
-        // fields after comm start at "state" (field 3); utime is field 14, stime field 15
-        return Long.parseLong(f[11]) + Long.parseLong(f[12]);
+    /** utime + stime from a /proc/.../stat file, or 0 when it can't be read. */
+    private long procJiffies(String statPath){
+        int len = readStat(statPath);
+        return len > 0 ? statJiffies(len) : 0;
+    }
+
+    /**
+     * Reads a /proc stat file once into statBuf_ and adds "id:name" -> utime + stime. With ~200 processes and their
+     * threads read every sample, this avoids the per-file reader buffers and split() that used to make ~10 MB of
+     * garbage per sample on the car.
+     */
+    private void putStat(Map<String, Long> result, String id, String statPath){
+        int len = readStat(statPath);
+        if (len <= 0) return;
+        int open = indexOf(len, (byte) '(', true);
+        int close = indexOf(len, (byte) ')', false);
+        if (open < 0 || close <= open) return;
+        long jiffies = statJiffies(len);
+        if (jiffies >= 0){
+            result.put(id + ":" + new String(statBuf_, open + 1, close - open - 1, US_ASCII), jiffies);
+        }
+    }
+
+    /** Reads up to statBuf_.length bytes of a small /proc file; returns the length, or -1. Sampling thread only. */
+    private int readStat(String path){
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(path);
+            int len = 0;
+            int n;
+            while (len < statBuf_.length && (n = in.read(statBuf_, len, statBuf_.length - len)) > 0){
+                len += n;
+            }
+            return len;
+        } catch (IOException e){
+            return -1;
+        } finally {
+            if (in != null){
+                try { in.close(); } catch (IOException ignored) {}
+            }
+        }
+    }
+
+    private int indexOf(int len, byte b, boolean first){
+        if (first){
+            for (int i = 0; i < len; i++) if (statBuf_[i] == b) return i;
+        } else {
+            for (int i = len - 1; i >= 0; i--) if (statBuf_[i] == b) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * utime + stime (fields 14 and 15) from the stat line in statBuf_. The comm field may contain spaces, so count
+     * fields from after the last ')': "state" is the first, utime the 12th. Returns -1 if the line is malformed.
+     */
+    private long statJiffies(int len){
+        int i = indexOf(len, (byte) ')', false);
+        if (i < 0) return -1;
+        i += 2; // ") " -> start of state
+        for (int field = 0; field < 11; field++){
+            while (i < len && statBuf_[i] != ' ') i++;
+            i++;
+        }
+        long utime = 0;
+        while (i < len && statBuf_[i] >= '0' && statBuf_[i] <= '9') utime = utime * 10 + (statBuf_[i++] - '0');
+        i++;
+        long stime = 0;
+        while (i < len && statBuf_[i] >= '0' && statBuf_[i] <= '9') stime = stime * 10 + (statBuf_[i++] - '0');
+        return i <= len ? utime + stime : -1;
     }
 
     /** {total, idle} jiffies from the aggregate cpu line of /proc/stat. */
@@ -491,15 +553,12 @@ public class ResourceMonitor {
         return new long[]{total, idle};
     }
 
-    private static Map<String, Long> threadJiffies(){
+    private Map<String, Long> threadJiffies(){
         Map<String, Long> result = new HashMap<>();
-        File[] tasks = new File("/proc/self/task").listFiles();
-        if (tasks == null) return result;
-        for (File task : tasks){
-            String stat = readFirstLine(task.getPath() + "/stat");
-            if (stat == null) continue;
-            String name = stat.substring(stat.indexOf('(') + 1, stat.lastIndexOf(')'));
-            result.put(task.getName() + ":" + name, procJiffies(task.getPath() + "/stat"));
+        String[] tids = new File("/proc/self/task").list();
+        if (tids == null) return result;
+        for (String tid : tids){
+            putStat(result, tid, "/proc/self/task/" + tid + "/stat");
         }
         return result;
     }

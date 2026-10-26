@@ -6,6 +6,8 @@ import android.util.Log;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import it.smg.libs.common.ILog;
 
@@ -15,6 +17,8 @@ public class ODALog implements ILog {
     private static final String TAG = "ODALog";
 
     private final Settings settings_;
+    // restarting logcat sleeps ~1.8 s; reload() and shutdown() are called from the UI, so do it off the main thread
+    private final ExecutorService logcatExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODALog"));
     private Process logProcess_;
     private int logLevel_;
     private boolean logProtocol_;
@@ -49,12 +53,12 @@ public class ODALog implements ILog {
 
     @Override
     public void reload() {
-        initProcessLog();
+        logcatExecutor_.execute(this::initProcessLog);
     }
 
     @Override
     public void shutdown() {
-        _deInit();
+        logcatExecutor_.execute(this::_deInit);
     }
 
     private void initProcessLog(){
