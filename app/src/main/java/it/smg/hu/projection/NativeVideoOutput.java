@@ -11,11 +11,12 @@ import androidx.annotation.RequiresApi;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import it.smg.libs.common.Log;
 
 @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
-public class NativeVideoOutput extends VideoOutput implements Runnable {
+public class NativeVideoOutput extends VideoOutput implements Runnable, VideoStats.DecoderStats {
 
     private static final String TAG = "NativeVideoOutput";
 
@@ -27,6 +28,12 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
     private volatile boolean configured_;
     private volatile boolean running_;
     private Thread codecThread_;
+
+    // for VideoStats: frames written to / rendered by the codec, and the peak backlog in between
+    private final AtomicInteger written_ = new AtomicInteger();
+    private final AtomicInteger rendered_ = new AtomicInteger();
+    private final AtomicInteger renderedSinceStats_ = new AtomicInteger();
+    private final AtomicInteger maxBacklog_ = new AtomicInteger();
 
     public NativeVideoOutput(SurfaceView surfaceView){
         super(surfaceView);
@@ -66,6 +73,7 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
             // set before the thread starts, otherwise it may see false and exit immediately
             running_ = true;
             codecThread_.start();
+            VideoStats.instance().setDecoderStats(this);
             return true;
         } catch (IOException e) {
             return false;
@@ -90,6 +98,10 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
                     buffer.put(buf);
                     buffer.flip();
                     codec_.queueInputBuffer(index, 0, buf.limit(), timestamp, 0);
+                    int backlog = written_.incrementAndGet() - rendered_.get();
+                    if (backlog > maxBacklog_.get()) {
+                        maxBacklog_.set(backlog);
+                    }
                 }
             }
         }
@@ -99,6 +111,7 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
     @Override
     public void stop() {
         if (Log.isInfo()) Log.i(TAG, "shutdown");
+        VideoStats.instance().setDecoderStats(null);
         if (running_) {
             running_ = false;
             configured_ = false;
@@ -112,6 +125,12 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
             codec_ = null;
 
         }
+    }
+
+    @Override
+    public int[] takeDecoderStats() {
+        int backlog = Math.max(0, written_.get() - rendered_.get());
+        return new int[]{renderedSinceStats_.getAndSet(0), Math.max(maxBacklog_.getAndSet(backlog), backlog)};
     }
 
     @Override
@@ -133,6 +152,8 @@ public class NativeVideoOutput extends VideoOutput implements Runnable {
 
                     // setting true is telling system to render frame onto Surface
                     codec_.releaseOutputBuffer(index, true);
+                    rendered_.incrementAndGet();
+                    renderedSinceStats_.incrementAndGet();
                 }
             }
         }

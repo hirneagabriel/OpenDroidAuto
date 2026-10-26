@@ -22,6 +22,8 @@ public:
     status_t stop() override;
     sp<MetaData> getFormat() override;
     void queueBuffer(MediaBuffer* buffer);
+    // longest the input queue got since the previous call (frames waiting for the decoder)
+    int takeMaxQueued();
 
     status_t pause() override {
         return ERROR_UNSUPPORTED;
@@ -44,6 +46,7 @@ private:
     std::condition_variable cond_;
 
     bool quitFlag_;
+    int maxQueued_ = 0;
 
     MediaBuffer* nextBuffer();
 };

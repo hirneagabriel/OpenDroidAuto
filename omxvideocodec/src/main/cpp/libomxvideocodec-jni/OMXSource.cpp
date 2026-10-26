@@ -37,12 +37,22 @@ OMXSource::~OMXSource() {
     if (Log::isDebug()) Log_d("destructor");
 }
 
+int OMXSource::takeMaxQueued(){
+    std::unique_lock<std::mutex> l(mutex_);
+    int max = maxQueued_;
+    maxQueued_ = (int) pbuffers_.size();
+    return max;
+}
+
 void OMXSource::queueBuffer(MediaBuffer* buffer){
     if (Log::isVerbose()) Log_v("add buffer to queue");
     std::unique_lock<std::mutex> l(mutex_);
 
     if (!quitFlag_) {
         pbuffers_.push(buffer);
+        if ((int) pbuffers_.size() > maxQueued_) {
+            maxQueued_ = (int) pbuffers_.size();
+        }
         if (Log::isVerbose()) Log_v("queueBuffer new size %d", pbuffers_.size());
         cond_.notify_one();
     }

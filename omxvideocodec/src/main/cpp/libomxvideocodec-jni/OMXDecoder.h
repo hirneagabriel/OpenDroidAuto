@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include <utils/Errors.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/MediaSource.h>
@@ -21,6 +23,8 @@ public:
     void stop();
     ~OMXDecoder();
     status_t getStatus() const;
+    // frames handed to the screen since the previous call
+    uint32_t takeRenderedFrames();
 protected:
 
 
@@ -33,4 +37,5 @@ private:
     int32_t frameRate_;
 
     status_t status_;
+    std::atomic<uint32_t> renderedFrames_{0};
 };

@@ -68,6 +68,10 @@ OMXDecoder::~OMXDecoder(){
     if (Log::isDebug()) Log_d("all done");
 }
 
+uint32_t OMXDecoder::takeRenderedFrames(){
+    return renderedFrames_.exchange(0);
+}
+
 status_t OMXDecoder::read(){
     if (Log::isVerbose()) Log_v("read");
 
@@ -89,6 +93,7 @@ status_t OMXDecoder::read(){
                                              videoBuffer->graphicBuffer().get());
             if (ret == 0) {
                 metaData->setInt32(kKeyRendered, 1);
+                renderedFrames_++;
             }
         }
     }

@@ -48,17 +48,24 @@ def summarize(path):
     groups = defaultdict(list)
     for r in rows:
         if r.get("video_fps") and float(r["video_fps"]) > 0:
-            groups[r.get("video_max_unacked", "?")].append(r)
-    for unacked, vrows in sorted(groups.items()):
+            limit = r.get("video_fps_limit") or "0"
+            groups[(r.get("video_max_unacked", "?"), "off" if limit == "0" else limit)].append(r)
+    for (unacked, limit), vrows in sorted(groups.items()):
         fps = [float(r["video_fps"]) for r in vrows]
         kbps = [float(r["video_kb_per_s"]) for r in vrows]
         frame = [float(r["video_max_frame_kb"]) for r in vrows]
         gaps = sorted(float(r["video_max_gap_ms"]) for r in vrows)
-        print(f"   video, {unacked} frame(s) in flight ({len(vrows)} samples with video):")
+        print(f"   video, {unacked} frame(s) in flight, fps limit {limit} ({len(vrows)} samples with video):")
         print(f"     frames/s             avg {sum(fps) / len(fps):6.1f}   max {max(fps):6.1f}")
         print(f"     KB/s                 avg {sum(kbps) / len(kbps):6.1f}   max {max(kbps):6.1f}")
         print(f"     largest frame (KB)                max {max(frame):6.0f}")
         print(f"     longest gap (ms)  median {gaps[len(gaps) // 2]:6.0f}   max {gaps[-1]:6.0f}")
+        rendered = [float(r["video_rendered_fps"]) for r in vrows if r.get("video_rendered_fps")]
+        queued = [int(r["video_max_queued"]) for r in vrows if r.get("video_max_queued")]
+        if rendered:
+            print(f"     rendered frames/s    avg {sum(rendered) / len(rendered):6.1f}   max {max(rendered):6.1f}")
+        if queued:
+            print(f"     frames waiting for decoder  avg peak {sum(queued) / len(queued):4.1f}   max {max(queued):4d}")
 
     # busiest threads: average CPU % over all samples, by thread name
     totals = defaultdict(float)

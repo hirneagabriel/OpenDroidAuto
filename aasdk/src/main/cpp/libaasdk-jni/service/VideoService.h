@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <chrono>
+#include <boost/asio/steady_timer.hpp>
 #include "channel/av/VideoServiceChannel.hpp"
 #include "channel/av/IVideoServiceChannelEventHandler.hpp"
 #include "projection/IVideoOutput.h"
@@ -35,6 +37,9 @@ private:
     using std::enable_shared_from_this<VideoService>::shared_from_this;
     void sendVideoFocusIndication();
     void sendVideoFocusReleaseIndication();
+    void sendAck();
+    void sendPendingAcks();
+    void onAckTimer(const boost::system::error_code& error);
 
     aasdk::io::strand strand_;
     aasdk::channel::av::VideoServiceChannel::Pointer channel_;
@@ -43,6 +48,14 @@ private:
     service::IVideoEventHandler::Pointer eventHandler_;
     IServiceEventHandler::Pointer serviceEventHandler_;
     bool isRunning_;
+
+    // ack pacing: with a frame rate limit, acks are spaced by ackInterval_ so the phone
+    // (which waits for acks, see max_unacked) can't send frames faster than that
+    boost::asio::steady_timer ackTimer_;
+    std::chrono::steady_clock::duration ackInterval_;
+    std::chrono::steady_clock::time_point nextAckTime_;
+    uint32_t pendingAcks_;
+    bool ackTimerArmed_;
 };
 
 }

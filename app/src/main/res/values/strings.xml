@@ -16,6 +16,7 @@
 	<string name="video_settings">Video Settings</string>
 	<string name="video_settings_resolution">Resolution</string>
 	<string name="video_settings_fps">FPS</string>
+	<string name="video_settings_fps_limit">Limit video frame rate (takes effect on next connection)</string>
 	<string name="video_settings_max_unacked">Video frames in flight (takes effect on next connection)</string>
 	<string name="video_settings_dpi">DPI</string>
 	<string name="video_settings_margin">Margin</string>

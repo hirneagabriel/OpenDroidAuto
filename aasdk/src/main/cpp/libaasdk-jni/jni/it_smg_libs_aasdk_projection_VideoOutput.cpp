@@ -28,6 +28,7 @@ void JVideoOutput::initJavaMethods() {
     getScreenDPIMethodId_ = env->GetMethodID(cls, "getScreenDPI", "()I");
     getVideoMarginsMethodId_ = env->GetMethodID(cls, "getVideoMargins", "()Lit/smg/libs/aasdk/projection/IVideoOutput$Rect;");
     getMaxUnackedFramesMethodId_ = env->GetMethodID(cls, "getMaxUnackedFrames", "()I");
+    getFrameRateLimitMethodId_ = env->GetMethodID(cls, "getFrameRateLimit", "()I");
 
     env->DeleteLocalRef(cls);
 
@@ -103,6 +104,12 @@ uint32_t JVideoOutput::getMaxUnackedFrames() {
     JNIEnv* env = getJniEnv();
     jint ret = env->CallIntMethod(androidClass_, getMaxUnackedFramesMethodId_);
     return ret < 1 ? 1 : (uint32_t)ret;
+}
+
+uint32_t JVideoOutput::getFrameRateLimit() {
+    JNIEnv* env = getJniEnv();
+    jint ret = env->CallIntMethod(androidClass_, getFrameRateLimitMethodId_);
+    return ret < 0 ? 0 : (uint32_t)ret;
 }
 
 Rect JVideoOutput::getVideoMargins() {

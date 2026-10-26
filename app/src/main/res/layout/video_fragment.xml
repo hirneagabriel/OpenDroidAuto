@@ -60,6 +60,22 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:gravity="center"
+        android:textColor="#000"
+        android:labelFor="@id/video_fps_limit"
+        android:text="@string/video_settings_fps_limit"/>
+
+    <Spinner
+        android:id="@+id/video_fps_limit"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:textColor="#000"
+        android:gravity="center_horizontal"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
         android:labelFor="@id/video_dpi"
         android:textColor="#000"
         android:text="@string/video_settings_dpi"/>

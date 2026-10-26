@@ -31,6 +31,7 @@ public:
     virtual size_t getScreenDPI() = 0;
     virtual Rect getVideoMargins() = 0;
     virtual uint32_t getMaxUnackedFrames() = 0;
+    virtual uint32_t getFrameRateLimit() = 0;
 };
 
 }

@@ -52,7 +52,8 @@ public class ResourceMonitor {
 
     private static final String CSV_HEADER = "time,uptime_s,proc_cpu_pct,sys_cpu_pct,java_used_kb,java_max_kb,"
             + "native_alloc_kb,total_pss_kb,dalvik_pss_kb,native_pss_kb,other_pss_kb,sys_avail_kb,sys_low_memory,"
-            + "video_fps,video_kb_per_s,video_max_frame_kb,video_max_gap_ms,video_max_unacked,"
+            + "video_fps,video_rendered_fps,video_kb_per_s,video_max_frame_kb,video_max_gap_ms,video_max_queued,"
+            + "video_max_unacked,video_fps_limit,"
             + "threads,top_threads";
 
     private static ResourceMonitor instance_;
@@ -317,8 +318,11 @@ public class ResourceMonitor {
 
         // video frames received since the previous sample
         VideoStats.Snapshot video = VideoStats.instance().snapshot();
-        String videoCols = first ? ",,,," : String.format(Locale.US, "%.1f,%.1f,%d,%d,",
-                video.frames / elapsedS, video.bytes / 1024.0 / elapsedS, video.maxFrameBytes / 1024, video.maxGapMs);
+        String videoCols = first ? ",,,,,," : String.format(Locale.US, "%.1f,%s,%.1f,%d,%d,%s,",
+                video.frames / elapsedS,
+                video.renderedFrames >= 0 ? String.format(Locale.US, "%.1f", video.renderedFrames / elapsedS) : "",
+                video.bytes / 1024.0 / elapsedS, video.maxFrameBytes / 1024, video.maxGapMs,
+                video.maxQueued >= 0 ? String.valueOf(video.maxQueued) : "");
 
         csv.println(timeFormat_.format(new Date()) + ","
                 + (nowMs - startUptime_) / 1000 + ","
@@ -335,6 +339,7 @@ public class ResourceMonitor {
                 + sysMem.lowMemory + ","
                 + videoCols
                 + video.maxUnackedFrames + ","
+                + video.frameRateLimit + ","
                 + threadJiffies.size() + ","
                 + top);
         csv.flush();

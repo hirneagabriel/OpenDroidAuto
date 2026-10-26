@@ -25,6 +25,7 @@ public:
     size_t getScreenDPI() override;
     Rect getVideoMargins() override;
     uint32_t getMaxUnackedFrames() override;
+    uint32_t getFrameRateLimit() override;
 
     ~JVideoOutput();
 private:
@@ -37,6 +38,7 @@ private:
     jmethodID getScreenDPIMethodId_;
     jmethodID getVideoMarginsMethodId_;
     jmethodID getMaxUnackedFramesMethodId_;
+    jmethodID getFrameRateLimitMethodId_;
 
     jclass byteBufferCls_;
     jmethodID bbOrderID_;

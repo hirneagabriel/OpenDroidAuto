@@ -15,6 +15,7 @@ public class OMXVideoCodec {
     private static native void nativeInit();
     private native long nativeSetup();
     private native void nativeSurfaceInit(Object surface, int width, int height);
+    private native int[] nativeTakeStats();
     private native boolean nativeDecoderInit(int fps);
     private native void nativeDelete();
     private native void nativeConsume(ByteBuffer buf, int len, long t);
@@ -69,5 +70,10 @@ public class OMXVideoCodec {
     private boolean isSps(ByteBuffer buf) {
         boolean sps = (buf.get(4) & 0x1f ) == 7;
         return sps;
+    }
+
+    /** {frames rendered, peak decoder input queue length} since the previous call. */
+    public int[] takeStats(){
+        return nativeTakeStats();
     }
 }

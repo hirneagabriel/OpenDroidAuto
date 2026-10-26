@@ -20,7 +20,8 @@ public abstract class VideoOutput extends it.smg.libs.aasdk.projection.VideoOutp
         resolution_ = settings_.video.resolution();
         dpi_ = settings_.video.dpi();
         maxUnackedFrames_ = settings_.video.maxUnackedFrames();
-        VideoStats.instance().newSession(maxUnackedFrames_);
+        frameRateLimit_ = settings_.video.frameRateLimit();
+        VideoStats.instance().newSession(maxUnackedFrames_, frameRateLimit_);
 
         String margin = settings_.video.margin();
         try {

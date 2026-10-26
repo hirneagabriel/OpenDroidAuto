@@ -5,7 +5,8 @@ import android.os.SystemClock;
 /**
  * Counts the video frames received from the phone, for ResourceMonitor: frame rate, data rate,
  * largest frame and longest gap between frames show how smoothly video arrives (e.g. while
- * panning the map or during screen transitions).
+ * panning the map or during screen transitions); rendered frames and the decoder's input
+ * backlog show whether the head unit keeps up with it.
  */
 public class VideoStats {
 
@@ -15,23 +16,38 @@ public class VideoStats {
         return instance_;
     }
 
+    /** Implemented by the video output that owns the decoder. */
+    public interface DecoderStats {
+        /** {frames rendered, peak frames waiting for the decoder} since the previous call, or null. */
+        int[] takeDecoderStats();
+    }
+
     public static class Snapshot {
         public final int frames;
         public final long bytes;
         public final int maxFrameBytes;
         public final long maxGapMs;
         public final int maxUnackedFrames;
+        public final int frameRateLimit;
+        public final int renderedFrames; // -1 when no decoder reports
+        public final int maxQueued;      // -1 when no decoder reports
 
-        private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs, int maxUnackedFrames){
+        private Snapshot(int frames, long bytes, int maxFrameBytes, long maxGapMs, int maxUnackedFrames,
+                         int frameRateLimit, int renderedFrames, int maxQueued){
             this.frames = frames;
             this.bytes = bytes;
             this.maxFrameBytes = maxFrameBytes;
             this.maxGapMs = maxGapMs;
             this.maxUnackedFrames = maxUnackedFrames;
+            this.frameRateLimit = frameRateLimit;
+            this.renderedFrames = renderedFrames;
+            this.maxQueued = maxQueued;
         }
     }
 
+    private DecoderStats decoderStats_;
     private int maxUnackedFrames_;
+    private int frameRateLimit_;
     private int frames_;
     private long bytes_;
     private int maxFrameBytes_;
@@ -41,9 +57,14 @@ public class VideoStats {
     private VideoStats(){}
 
     /** Called when a video output is created for a new connection. */
-    public synchronized void newSession(int maxUnackedFrames){
+    public synchronized void newSession(int maxUnackedFrames, int frameRateLimit){
         maxUnackedFrames_ = maxUnackedFrames;
+        frameRateLimit_ = frameRateLimit;
         lastFrameMs_ = 0;
+    }
+
+    public synchronized void setDecoderStats(DecoderStats decoderStats){
+        decoderStats_ = decoderStats;
     }
 
     public synchronized void onFrame(int size){
@@ -58,12 +79,22 @@ public class VideoStats {
     }
 
     /** Returns the counts since the previous snapshot and resets them. */
-    public synchronized Snapshot snapshot(){
-        Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_, maxUnackedFrames_);
-        frames_ = 0;
-        bytes_ = 0;
-        maxFrameBytes_ = 0;
-        maxGapMs_ = 0;
-        return s;
+    public Snapshot snapshot(){
+        DecoderStats decoderStats;
+        synchronized (this) {
+            decoderStats = decoderStats_;
+        }
+        // outside our lock: the decoder's owner locks itself and calls setDecoderStats() on stop
+        int[] decoder = decoderStats != null ? decoderStats.takeDecoderStats() : null;
+
+        synchronized (this) {
+            Snapshot s = new Snapshot(frames_, bytes_, maxFrameBytes_, maxGapMs_, maxUnackedFrames_, frameRateLimit_,
+                    decoder != null ? decoder[0] : -1, decoder != null ? decoder[1] : -1);
+            frames_ = 0;
+            bytes_ = 0;
+            maxFrameBytes_ = 0;
+            maxGapMs_ = 0;
+            return s;
+        }
     }
 }

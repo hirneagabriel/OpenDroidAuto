@@ -39,6 +39,9 @@ public class VideoFragment extends BaseSettingsFragment {
         Spinner maxUnacked = view.findViewById(R.id.video_max_unacked);
         initSpinner(maxUnacked, R.array.video_max_unacked_labels, R.array.video_max_unacked_values, settings.video, Settings.Video.VIDEO_MAX_UNACKED, Settings.Video.VIDEO_MAX_UNACKED_DEFAULT_VALUE);
 
+        Spinner fpsLimit = view.findViewById(R.id.video_fps_limit);
+        initSpinner(fpsLimit, R.array.video_fps_limit_labels, R.array.video_fps_limit_values, settings.video, Settings.Video.VIDEO_FPS_LIMIT, Settings.Video.VIDEO_FPS_LIMIT_DEFAULT_VALUE);
+
         EditText dpi = view.findViewById(R.id.video_dpi);
         initEditText(dpi, settings.video, Settings.Video.VIDEO_DPI, Settings.Video.VIDEO_DPI_DEFAULT_VALUE);
 

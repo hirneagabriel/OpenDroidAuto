@@ -38,6 +38,20 @@
         <item>4</item>
     </integer-array>
 
+    <string-array name="video_fps_limit_labels">
+        <item>Off (default)</item>
+        <item>30</item>
+        <item>25</item>
+        <item>20</item>
+    </string-array>
+
+    <integer-array name="video_fps_limit_values">
+        <item>0</item>
+        <item>30</item>
+        <item>25</item>
+        <item>20</item>
+    </integer-array>
+
     <string-array name="video_nightmode">
         <item>TIME/GPS</item>
         <item>LIGHT</item>

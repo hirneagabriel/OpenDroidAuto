@@ -14,6 +14,7 @@ public interface IVideoOutput {
     int getScreenDPI();
     Rect getVideoMargins();
     int getMaxUnackedFrames();
+    int getFrameRateLimit();
     void delete();
 
     @Keep

@@ -26,6 +26,8 @@ public:
     void queueBuffer(common::DataConstBuffer& b, int64_t timestamp);
 
     void setSps(common::DataConstBuffer &b);
+    // frames rendered and peak input queue length since the previous call
+    void takeStats(uint32_t& rendered, int& maxQueued);
 
     ~OMXVideoCodec();
 private:
