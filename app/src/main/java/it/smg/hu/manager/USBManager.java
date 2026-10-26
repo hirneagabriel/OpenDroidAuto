@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import it.smg.hu.config.Settings;
 import it.smg.hu.service.ODAService;
@@ -43,6 +45,9 @@ public class USBManager {
     private static final String URI = "https://forum.xda-developers.com/t/honda-connect-android-system.3179549";
     private static final String SERIAL = "HU-AAAAAA001";
 
+    // a phone answers the accessory requests in milliseconds; one that doesn't is retried on the next attach
+    private static final int AOAP_TIMEOUT_MS = 2000;
+
     public static final String ACTION_USB_PERMISSION =  "it.smg.hu.USB_PERMISSION";
     public static final String DETACH_AOAP_DEVICE = "it.smg.hu.DETACH_AOAP_DEVICE";
     public static final String ATTACH_AOAP_DEVICE = "it.smg.hu.ATTACH_AOAP_DEVICE";
@@ -51,7 +56,10 @@ public class USBManager {
 
     private final Context ctx_;
     private final UsbManager usbManager_;
-    private LibUsbDevice usbDevice_;
+    // set on the USB thread, read from the UI and the widget
+    private volatile LibUsbDevice usbDevice_;
+    // switching a phone to accessory mode and opening it block on USB control transfers: keep them off the main thread
+    private final ExecutorService usbExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODA USB"));
     private final LocalBroadcastManager localBroadcastManager_;
 
     private static USBManager instance_;
@@ -113,7 +121,12 @@ public class USBManager {
         return device.manufacter + "/" + device.product;
     }
 
-    public boolean checkDevice(UsbDevice device){
+    /** Checks a newly attached device on the USB thread: asks for permission, or switches it to Android Auto. */
+    public void checkDevice(UsbDevice device){
+        usbExecutor_.execute(() -> checkDeviceNow(device));
+    }
+
+    private boolean checkDeviceNow(UsbDevice device){
         if (Log.isInfo()) Log.i(TAG, "checkDevice");
 
         // launched by USB_DEVICE_ATTACHED the system has already granted it; otherwise ask, and continue in usbReceiver_
@@ -209,7 +222,7 @@ public class USBManager {
                 if (Log.isDebug()) Log.d(TAG, "switch to OAP");
 
                 byte[] buffer = new byte[2];
-                int len = usbConnection.controlTransfer(UsbConstants.USB_DIR_IN | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_GET_PROTOCOL, 0, 0, buffer, 2, 10000);
+                int len = usbConnection.controlTransfer(UsbConstants.USB_DIR_IN | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_GET_PROTOCOL, 0, 0, buffer, 2, AOAP_TIMEOUT_MS);
                 if (len != 2) {
                     Log.e(TAG, "Error controlTransfer GET_PROTOCOL len: " + len);
                     return false;
@@ -223,7 +236,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Manufacter " + MANUFACTURER);
                 buffer = (MANUFACTURER + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Manufacter, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -231,7 +244,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Model " + MODEL);
                 buffer = (MODEL + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 1, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 1, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Model, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -239,7 +252,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Desc " + DESC);
                 buffer = (DESC + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 2, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 2, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Desc, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -247,7 +260,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Version " + VERSION);
                 buffer = (VERSION + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 3, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Version, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -255,7 +268,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send URI " + URI);
                 buffer = (URI + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 4, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Manufacter, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -263,14 +276,14 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Serial " + SERIAL);
                 buffer = (SERIAL + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 5, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Serial, len= " + len + " expected= " + buffer.length);
                     return false;
                 }
 
                 if (Log.isDebug()) Log.d(TAG, "Sending acc start");           // Send accessory start request. Device should re-enumerate as an accessory.
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_START, 0, 0, null, 0, 10000);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_START, 0, 0, null, 0, AOAP_TIMEOUT_MS);
                 if (len != 0) {
                     Log.e(TAG, "Error in accessory start request");
                     return false;
