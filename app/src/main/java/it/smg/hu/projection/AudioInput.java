@@ -21,6 +21,11 @@ public class AudioInput extends it.smg.libs.aasdk.projection.AudioInput {
     private AudioRecord audioRecord_;
     private boolean isActive_;
 
+    // diagnostics: the loudest sample read in the last second, logged so silence (mic path closed) shows in the log
+    private static final long LEVEL_LOG_MS = 1000;
+    private int levelPeak_;
+    private long levelSinceMs_;
+
     public AudioInput(){
         settings_ = Settings.instance();
         hondaConnectManager_ = settings_.advanced.hondaIntegrationEnabled() ? HondaConnectManager.instance() : null;
@@ -83,7 +88,26 @@ public class AudioInput extends it.smg.libs.aasdk.projection.AudioInput {
             return 0;
         }
 
-        return audioRecord_.read(buffer, bytesToRead);
+        int read = audioRecord_.read(buffer, bytesToRead);
+        if (read > 0 && sampleSize_ == 16) {
+            logLevel(buffer, read);
+        }
+        return read;
+    }
+
+    // AudioRecord.read(ByteBuffer) fills the buffer from its start; samples are 16-bit little endian
+    private void logLevel(ByteBuffer buffer, int length) {
+        for (int i = 0; i + 1 < length; i += 2) {
+            int sample = (short) ((buffer.get(i) & 0xff) | (buffer.get(i + 1) << 8));
+            int level = Math.abs(sample);
+            if (level > levelPeak_) levelPeak_ = level;
+        }
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - levelSinceMs_ >= LEVEL_LOG_MS) {
+            if (Log.isInfo()) Log.i(TAG, "mic level: peak " + levelPeak_ + " of 32767");
+            levelPeak_ = 0;
+            levelSinceMs_ = now;
+        }
     }
 
     @Keep
@@ -121,6 +145,11 @@ public class AudioInput extends it.smg.libs.aasdk.projection.AudioInput {
             return false;
         }
 
+        levelPeak_ = 0;
+        levelSinceMs_ = android.os.SystemClock.elapsedRealtime();
+        if (Log.isInfo()) Log.i(TAG, "recording: source " + sourceType_ + ", " + sampleRate_ + " Hz, " + channelConfig_
+                + " ch, car voice mode " + (hondaConnectManager_ != null && settings_.advanced.hondaMicVrEnabled()
+                ? (hondaConnectManager_.isMicSessionStarted() ? "started" : "FAILED") : "not used"));
         return true;
     }
 

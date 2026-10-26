@@ -71,6 +71,8 @@ public class HondaConnectManager {
     private final ServiceConnection ecNcServiceConnection_;
     private boolean boundToEcNcService_;
     private boolean micVrStarted_;
+    // startVR was called, even if it failed: the car may still be half in voice mode (media muted) and needs endVr
+    private boolean micVrRequested_;
 
     private final Context context_;
     private final Settings settings_;
@@ -97,6 +99,7 @@ public class HondaConnectManager {
         hasAudioFocus_ = false;
         boundToEcNcService_ = false;
         micVrStarted_ = false;
+        micVrRequested_ = false;
         mainHandler_ = new Handler(Looper.getMainLooper());
 
         modeMgrManager_ = (ModeMgrManager) context.getSystemService(ModeMgrService);
@@ -146,6 +149,7 @@ public class HondaConnectManager {
                 boundToEcNcService_ = false;
                 ecNcServiceIface_ = null;
                 micVrStarted_ = false; // force to false
+                micVrRequested_ = false;
             }
         };
 
@@ -382,20 +386,29 @@ public class HondaConnectManager {
             }
 
             try {
+                micVrRequested_ = true;
                 int ret = ecNcServiceIface_.startVR(true);
-                if (Log.isDebug()) {
-                    Log.d(TAG, "ecNcServiceIface_ startVR ret= " + ret);
-//                    mainHandler_.post(() -> {
-//                        Toast.makeText(context_, "ecNcServiceIface_ startVR ret= " + ret, Toast.LENGTH_SHORT).show();
-//                    });
+                if (Log.isDebug()) Log.d(TAG, "ecNcServiceIface_ startVR ret= " + ret);
+                if (ret != 0) {
+                    // seen on the car: a voice session left over from a connection that didn't close cleanly
+                    // keeps the mic busy; end it and try once more
+                    if (Log.isWarn()) Log.w(TAG, "startVR failed (" + ret + "), ending a leftover voice session and retrying");
+                    ecNcServiceIface_.endVr();
+                    ret = ecNcServiceIface_.startVR(true);
                 }
                 if (ret == 0) {
                     micVrStarted_ = true;
+                } else if (Log.isWarn()) {
+                    Log.w(TAG, "startVR failed again (" + ret + ")");
                 }
             } catch (RemoteException e) {
                 Log.e(TAG, "startVR exception", e);
             }
         }
+    }
+
+    public boolean isMicSessionStarted() {
+        return micVrStarted_;
     }
 
     public void stopMicSession() {
@@ -406,22 +419,24 @@ public class HondaConnectManager {
         }
 
         if (boundToEcNcService_) {
-            if (!micVrStarted_) {
-                Log.w(TAG, "no mic session started, return");
+            // end it whenever we asked for it: a failed startVR can still leave the car in voice mode, media muted
+            if (!micVrRequested_) {
+                if (Log.isDebug()) Log.d(TAG, "no mic session requested, return");
                 return;
             }
+            micVrRequested_ = false;
 
             try {
                 int ret = ecNcServiceIface_.endVr();
+                if (ret != 0 && Log.isWarn()) Log.w(TAG, "endVr returned " + ret);
                 if (Log.isDebug()) {
                     Log.d(TAG, "ecNcServiceIface_ endVr ret= " + ret);
 //                    mainHandler_.post(() -> {
 //                        Toast.makeText(context_, "ecNcServiceIface_ endVr ret= " + ret, Toast.LENGTH_SHORT).show();
 //                    });
                 }
-                if (ret == 0) {
-                    micVrStarted_ = false;
-                }
+                // even if endVr failed: otherwise every later startMicSession would return "already started"
+                micVrStarted_ = false;
             } catch (RemoteException e) {
                 Log.e(TAG, "endVr exception", e);
             }
@@ -455,6 +470,7 @@ public class HondaConnectManager {
             boundToEcNcService_ = false;
             ecNcServiceIface_ = null;
             micVrStarted_ = false; // force to false
+            micVrRequested_ = false;
         }
     }
 
