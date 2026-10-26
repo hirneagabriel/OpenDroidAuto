@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Start the Honda-like AVD with its whole CPU usage capped, to roughly approach the
 # Tegra 3 head unit (still much faster per core; use the car's stats for real numbers).
+# The cap pauses the whole emulator when exceeded, which makes audio stutter; use a
+# higher quota (e.g. 400%) when listening to audio.
 #
 # usage: tools/honda-emulator.sh [avd-name] [cpu-quota] [app-heap]
 #   cpu-quota is a systemd CPUQuota for all emulator threads together, e.g. 100% = one host core
-#   app-heap is the per-app Java heap limit (dalvik.vm.heapgrowthlimit), default 64m
+#   app-heap is the per-app Java heap limit (dalvik.vm.heapgrowthlimit), default 48m like the head unit
 #
 # The emulator ignores hw.ramSize/vm.heapSize below its own minimums for recent images, so
 # the heap limit is set after boot through root (needs a Google APIs image, not Play Store).
@@ -12,7 +14,7 @@ set -euo pipefail
 
 AVD="${1:-Honda_Emulator}"
 QUOTA="${2:-100%}"
-HEAP="${3:-64m}"
+HEAP="${3:-48m}"
 SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
 ADB="$SDK/platform-tools/adb"
 
