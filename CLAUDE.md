@@ -39,6 +39,14 @@ Use a 32-bit **x86** AVD (e.g. API 30 Google APIs x86, ~800×480 landscape to ma
 
 The phone's head unit server accepts the first TCP connection as the head unit, so don't probe port 5277 before connecting. If Android Auto crashes with `IllegalStateException: Already connected`, `adb -s <phone> shell am force-stop com.google.android.projection.gearhead` and start the server again.
 
+`tools/honda-emulator.sh [avd] [cpu-quota]` starts the AVD under a systemd CPU quota (default `100%` = one host core) as a rough stand-in for the head unit. The `Honda_Emulator` AVD is configured with 800×480 @160 dpi, 1 GB RAM, 64 MB `vm.heapSize`, 2 cores. It still runs x86 code at host speed and uses `NativeVideoOutput`, not the car's `OMXVideoOutput`, so CPU and video numbers only matter when measured on the car.
+
+## Target hardware and resource measurement
+
+The car is a 2015 Civic Honda Connect unit: NVIDIA Tegra 3 (4× Cortex-A9), Android 4.0.4 (API 15), 7" touchscreen. New code must run on API 15 (no `quitSafely`, `Long.compare`, `MediaCodecList`, etc.); check with `./gradlew :app:lintDebug` and look for `NewApi` in `app/build/reports/lint-results-debug.xml` (the task itself fails on pre-existing errors).
+
+There is no adb on the car, so measurement goes through `manager/ResourceMonitor`, enabled by the "Log CPU/memory usage" checkbox in Advanced settings (`resourceMonitor` pref). It writes `device_<ts>.txt` (specs: CPU, RAM, display, heap limit) and `stats_<ts>.csv` (every 5 s: app/system CPU, per-thread CPU, Java/native/PSS memory, free RAM) to `<log dir>/stats/` on the USB stick, or `/sdcard/ODA/stats/` when the log dir doesn't exist (emulator: `adb pull /sdcard/ODA/stats/`). Summarize with `tools/stats_summary.py <stats.csv>...`. CPU % is relative to one core; thread names are truncated to 15 chars by the kernel; `sys_cpu_pct` is empty on Android 8+ (no `/proc/stat` access).
+
 ## Module layout
 
 - **`:common`** (`it.smg.libs.common`) — native `libcommon.so` (logging, JNI base helpers, backtrace) exported as a prefab package, plus the Java `Log` facade used everywhere.

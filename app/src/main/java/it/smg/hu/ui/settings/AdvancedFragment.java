@@ -11,6 +11,7 @@ import android.widget.Spinner;
 import it.smg.hu.R;
 import it.smg.hu.config.Settings;
 import it.smg.hu.manager.HondaConnectManager;
+import it.smg.hu.manager.ResourceMonitor;
 import it.smg.libs.common.Log;
 
 public class AdvancedFragment extends BaseSettingsFragment {
@@ -32,6 +33,12 @@ public class AdvancedFragment extends BaseSettingsFragment {
         EditText logDir = view.findViewById(R.id.log_dir);
         initEditText(logDir, settings.advanced, Settings.Advanced.ADVANCED_LOG_DIR, Settings.Advanced.ADVANCED_LOG_DIR_DEFAULT_VALUE, () -> {
             Log.reload();
+            return null;
+        });
+
+        CheckBox resourceMonitor = view.findViewById(R.id.resource_monitor);
+        initCheckBox(resourceMonitor, settings.advanced, Settings.Advanced.ADVANCED_RESOURCE_MONITOR, Settings.Advanced.ADVANCED_RESOURCE_MONITOR_DEFAULT_VALUE, () -> {
+            ResourceMonitor.instance().update();
             return null;
         });
 

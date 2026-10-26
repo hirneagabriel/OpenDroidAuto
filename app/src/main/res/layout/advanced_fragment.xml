@@ -81,6 +81,15 @@
         android:textColor="#000" />
 
     <CheckBox
+        android:id="@+id/resource_monitor"
+        android:layout_width="wrap_content"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="10dp"
+        android:text="@string/advanced_settings_resource_monitor"
+        android:textColor="#000" />
+
+    <CheckBox
         android:id="@+id/enable_wifi"
         android:layout_width="wrap_content"
         android:layout_height="64dp"

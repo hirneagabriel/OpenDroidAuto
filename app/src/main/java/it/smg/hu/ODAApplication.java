@@ -7,6 +7,7 @@ import androidx.multidex.MultiDexApplication;
 import it.smg.hu.config.ODALog;
 import it.smg.hu.config.Settings;
 import it.smg.hu.manager.HondaConnectManager;
+import it.smg.hu.manager.ResourceMonitor;
 import it.smg.hu.manager.USBManager;
 import it.smg.hu.manager.WIFIManager;
 
@@ -54,6 +55,7 @@ public class ODAApplication extends MultiDexApplication {
         USBManager.init(getApplicationContext());
         WIFIManager.init(getApplicationContext());
         AppBadge.init(getApplicationContext());
+        ResourceMonitor.init(getApplicationContext());
         if (Settings.instance().advanced.hondaIntegrationEnabled()) {
             HondaConnectManager.init(getApplicationContext());
         }
