@@ -18,6 +18,15 @@ struct NvxParamH264DisableDpb {
     OMX_BOOL bDisableDPB;
 };
 
+// layout as built by the head unit's OMXCodec::configureCodec, which only ever sets it to false
+// (partial frames, for MPEG-2); without it the decoder waits for the next frame's start before
+// finishing the current one, so the last frame before a pause stays on screen late
+struct NvxParamVdecFullFrameData {
+    OMX_U32 nSize;
+    OMX_VERSIONTYPE nVersion;
+    OMX_BOOL bFullFrameData;
+};
+
 template<class T>
 void initParams(T* params) {
     memset(params, 0, sizeof(T));
@@ -46,6 +55,12 @@ void LowLatencyOMX::enableLowLatency(node_id node) {
     initParams(&disableDpb);
     disableDpb.bDisableDPB = OMX_TRUE;
     setNvidiaParameter(node, "OMX.Nvidia.index.param.h264disabledpb", &disableDpb, sizeof(disableDpb));
+
+    // Android Auto sends exactly one complete frame per buffer
+    NvxParamVdecFullFrameData fullFrame;
+    initParams(&fullFrame);
+    fullFrame.bFullFrameData = OMX_TRUE;
+    setNvidiaParameter(node, "OMX.Nvidia.index.param.vdecfullframedata", &fullFrame, sizeof(fullFrame));
 }
 
 // unlike ACodec, which aborts on failure, just log: the decoder still works without it

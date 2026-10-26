@@ -7,7 +7,7 @@ using namespace android;
 /**
  * IOMX that forwards everything to the real one, and right after OMXCodec allocates the NVIDIA H.264
  * decoder switches it to low-latency mode, like the head unit's ACodec::setupCodecForVideoTelephony
- * does: low-buffer mode and no DPB. Without it the decoder keeps ~14 frames and only releases the
+ * does: low-buffer mode and no DPB, plus full-frame input (each buffer is one complete frame). Without it the decoder keeps ~14 frames and only releases the
  * last frames of an animation when newer ones arrive (the phone's stream already signals
  * max_num_reorder_frames=0, max_dec_frame_buffering=1, which the decoder ignores).
  */
