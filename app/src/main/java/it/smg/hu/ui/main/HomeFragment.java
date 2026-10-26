@@ -122,8 +122,8 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // a session may have started or ended while we were in the background
-        updateAaTile();
+        // the phone may have been unplugged, or a session started or ended, while we weren't listening
+        initUsbDeviceIcon();
     }
 
     private void updateWifiVisibility(){

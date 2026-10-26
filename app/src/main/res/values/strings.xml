@@ -101,6 +101,7 @@
 	<string name="main_notification_content">Android Auto Mode</string>
 	<string name="popup_notification_content">Phone connected</string>
 	<string name="popup_notification_hint">Tap to start Android Auto. After that it starts by itself.</string>
+	<string name="start_no_phone">Plug in your phone with a USB cable to start Android Auto</string>
 	<string name="usb_devices_title">USB devices</string>
 	<string name="usb_devices_close">Close</string>
 	<string name="usb_devices_empty">No USB devices found. Plug in your phone with a USB cable.</string>

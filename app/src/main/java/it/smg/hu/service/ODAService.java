@@ -13,6 +13,7 @@ import android.widget.Toast;
 import androidx.annotation.Keep;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import it.smg.hu.R;
 import it.smg.hu.config.Settings;
 import it.smg.hu.manager.HondaConnectManager;
 import it.smg.hu.manager.USBManager;
@@ -106,6 +107,12 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 //                    onAndroidAutoQuit();
                     return;
                 }
+            } else {
+                // nothing to start: close the (still black) Android Auto screen instead of leaving it open
+                if (Log.isWarn()) Log.w(TAG, "no aoap device, nothing to start");
+                mainHandler_.post(() -> Toast.makeText(this, R.string.start_no_phone, Toast.LENGTH_LONG).show());
+                localBroadcastManager_.sendBroadcast(new Intent(ODAService.STOP_ACTION));
+                return;
             }
             if (Log.isInfo()) Log.i(TAG, "start usb thead completed");
         });
