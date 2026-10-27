@@ -78,6 +78,13 @@ Java_it_smg_libs_aasdk_usb_LibUsbDevice_nativeClose(JNIEnv *env, jobject thiz) {
 }
 
 extern "C"
+JNIEXPORT void JNICALL
+Java_it_smg_libs_aasdk_usb_LibUsbDevice_nativeReset(JNIEnv *env, jobject thiz) {
+    JLibUsbDevice::Pointer jlibUsbDevice = JLibUsbDevice::getJLibUsbDevice(env, thiz);
+    jlibUsbDevice->getLibUsbDevice()->resetDevice();
+}
+
+extern "C"
 JNIEXPORT jint JNICALL
 Java_it_smg_libs_aasdk_usb_LibUsbDevice_nativeDeviceDescriptor(JNIEnv *env, jobject thiz) {
     JLibUsbDevice::Pointer jlibUsbDevice = JLibUsbDevice::getJLibUsbDevice(env, thiz);

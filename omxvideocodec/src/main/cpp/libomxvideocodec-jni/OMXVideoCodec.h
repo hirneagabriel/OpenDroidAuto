@@ -30,6 +30,8 @@ public:
     void takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs);
     // where frames waited since the previous call (OMXSource::cStageCount values, see OMXSource::takeStages)
     void takeStages(int64_t out[]);
+    // frames waiting for the decoder now
+    int queuedFrames();
 
     ~OMXVideoCodec();
 private:

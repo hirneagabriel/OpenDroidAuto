@@ -23,6 +23,7 @@ void JVideoOutput::initJavaMethods() {
     initMethodId_ = env->GetMethodID(cls, "init", "()Z");
     writeMethodId_ = env->GetMethodID(cls, "write", "(JLjava/nio/ByteBuffer;)V" );
     stopMethodId_ = env->GetMethodID(cls, "stop", "()V");
+    framesWaitingMethodId_ = env->GetMethodID(cls, "framesWaiting", "()I");
     getVideoFPSMethodId_ = env->GetMethodID(cls, "getVideoFPS", "()I");
     getVideoResolutionMethodId_ = env->GetMethodID(cls, "getVideoResolution", "()I");
     getScreenDPIMethodId_ = env->GetMethodID(cls, "getScreenDPI", "()I");
@@ -135,6 +136,11 @@ void JVideoOutput::write(uint64_t timestamp, const aasdk::common::DataConstBuffe
         byteBuffer = nullptr;
     }
 
+}
+
+int JVideoOutput::framesWaiting() {
+    JNIEnv* env = getJniEnv();
+    return env->CallIntMethod(androidClass_, framesWaitingMethodId_);
 }
 
 JVideoOutput::~JVideoOutput() {

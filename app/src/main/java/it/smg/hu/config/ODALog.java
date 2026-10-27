@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import it.smg.libs.common.ILog;
 
@@ -21,7 +23,13 @@ public class ODALog implements ILog {
     private final Settings settings_;
     // restarting logcat sleeps ~1.8 s; reload() and shutdown() are called from the UI, so do it off the main thread
     private final ExecutorService logcatExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODALog"));
-    private Process logProcess_;
+    private volatile Process logProcess_;
+    // the car keeps writes to the stick in memory for up to ~30 s and loses them when it hangs or loses power (a
+    // whole drive's log and stats were missing after the unit hung), so flush them while logging
+    private static final long SYNC_INTERVAL_S = 1;
+    private ScheduledExecutorService syncExecutor_;
+    // waits on logcatExecutor_ for the log dir: after the car wakes up the app can start before the USB stick is mounted
+    private static final long WAIT_FOR_LOG_DIR_MS = 120000;
     private int logLevel_;
     private boolean logProtocol_;
 
@@ -64,6 +72,11 @@ public class ODALog implements ILog {
     }
 
     private void initProcessLog(){
+        initProcessLog(true);
+    }
+
+    /** @param clear empty logcat's buffer first; false keeps what this run logged while waiting for the stick */
+    private void initProcessLog(boolean clear){
         if (logProcess_ != null){
             _deInit();
         }
@@ -77,6 +90,10 @@ public class ODALog implements ILog {
 
                 if (!extStoragePath.trim().isEmpty()) {
                     File extStorageDir = new File(extStoragePath);
+                    if (!extStorageDir.exists() && clear) {
+                        w_(TAG, "log dir " + extStorageDir + " not there yet, waiting for it");
+                        logcatExecutor_.execute(() -> waitForLogDir(extStorageDir));
+                    }
                     if (extStorageDir.exists()){
                         File logDirectory = new File(extStorageDir, "logs");
                         File logFile = new File(logDirectory, "logcat_" + System.currentTimeMillis() + ".txt");
@@ -89,15 +106,20 @@ public class ODALog implements ILog {
                             }
                         }
 
+                        copyCrashReports(logDirectory);
+
                         // clear the previous logcat and then write the new one to the file
                         try {
                             v_(TAG, "start logcat process");
-                            Runtime.getRuntime().exec("logcat -c");
-                            Thread.sleep(100);
+                            if (clear) {
+                                Runtime.getRuntime().exec("logcat -c");
+                                Thread.sleep(100);
+                            }
                             String cmd = "logcat -v threadtime -f " + logFile + " " + PACKAGE_NAME + ":V";
                             logProcess_ = Runtime.getRuntime().exec(cmd);
                             Thread.sleep(200);
                             v_(TAG, "started log process with cmd: " + cmd);
+                            startSyncing();
                         } catch (IOException e) {
                             e_(TAG, "error in start log process", e);
                             _deInit();
@@ -111,6 +133,72 @@ public class ODALog implements ILog {
             } else {
                 w_(TAG, "log storage not accessible");
             }
+        }
+    }
+
+    private synchronized void startSyncing(){
+        if (syncExecutor_ != null) return;
+        final Process shell;
+        try {
+            // one shell fed "sync" each second: cheaper than starting a process from the app every time, and it
+            // exits by itself (end of input) when the app is killed, unlike logcat
+            shell = Runtime.getRuntime().exec("sh");
+        } catch (IOException e) {
+            w_(TAG, "can't start syncing the log", e);
+            return;
+        }
+        final java.io.OutputStream commands = shell.getOutputStream();
+        syncExecutor_ = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ODALog sync"));
+        syncExecutor_.scheduleWithFixedDelay(() -> {
+            if (logProcess_ == null) return;
+            try {
+                commands.write("sync\n".getBytes());
+                commands.flush();
+            } catch (IOException ignored) {}
+        }, SYNC_INTERVAL_S, SYNC_INTERVAL_S, TimeUnit.SECONDS);
+    }
+
+    private void waitForLogDir(File dir){
+        long deadline = System.currentTimeMillis() + WAIT_FOR_LOG_DIR_MS;
+        try {
+            while (!dir.exists() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(2000);
+            }
+        } catch (InterruptedException e) {
+            return;
+        }
+        if (dir.exists() && logProcess_ == null) {
+            i_(TAG, "log dir " + dir + " appeared, starting the log");
+            initProcessLog(false);
+        }
+    }
+
+    /**
+     * Copies the system's crash reports to the stick, once each: the car's logcat is wiped when it restarts, but
+     * these survive it. traces.txt holds the thread dumps of the last ANR or system watchdog (a hung system shows
+     * as no sound, a black screen, then the boot logo).
+     */
+    private void copyCrashReports(File logDirectory){
+        copyOnce(new File("/data/anr/traces.txt"), logDirectory, "anr_traces_");
+        copyOnce(new File("/proc/last_kmsg"), logDirectory, "last_kmsg_");
+    }
+
+    private void copyOnce(File source, File logDirectory, String prefix){
+        if (!source.canRead()) return;
+        // /proc files have no meaningful time or size: name those by today's first copy only
+        long stamp = source.lastModified();
+        File target = new File(logDirectory, prefix + (stamp > 0 ? stamp : System.currentTimeMillis() / 86400000L) + ".txt");
+        if (target.exists()) return;
+        try (java.io.InputStream in = new java.io.FileInputStream(source);
+             java.io.OutputStream out = new java.io.FileOutputStream(target)) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) > 0) {
+                out.write(buffer, 0, n);
+            }
+            i_(TAG, "copied " + source + " to " + target);
+        } catch (IOException e) {
+            w_(TAG, "can't copy " + source, e);
         }
     }
 

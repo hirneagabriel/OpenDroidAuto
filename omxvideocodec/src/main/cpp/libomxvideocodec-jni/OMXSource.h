@@ -27,6 +27,8 @@ public:
     void queueBuffer(MediaBuffer* buffer);
     // longest the input queue got since the previous call (frames waiting for the decoder)
     int takeMaxQueued();
+    // frames waiting for the decoder now
+    int queuedFrames();
     // called by the decoder when the frame with this timestamp came out of the decoder
     void onDecoded(int64_t timeUs);
     // called by the decoder when the frame with this timestamp was handed to the screen

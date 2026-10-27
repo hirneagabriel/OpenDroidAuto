@@ -9,6 +9,8 @@ import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -19,6 +21,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -70,6 +73,10 @@ public class USBManager {
     private final LocalBroadcastManager localBroadcastManager_;
     // SystemClock.elapsedRealtime() until which a known phone is not started automatically
     private volatile long autoStartPausedUntil_;
+    // accessories this process saw attach (touched on the USB thread only)
+    private final java.util.Set<String> seenAccessories_ = new HashSet<>();
+    // how long after start an attach intent that launched the app gets to be handled before a leftover is reset
+    private static final long STALE_ACCESSORY_CHECK_DELAY_MS = 1500;
 
     private static USBManager instance_;
     private LibUsb libUsb_;
@@ -93,6 +100,24 @@ public class USBManager {
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         ctx_.registerReceiver(usbReceiver_, filter);
+
+        new Handler(Looper.getMainLooper()).postDelayed(
+                () -> usbExecutor_.execute(this::resetStaleAccessory), STALE_ACCESSORY_CHECK_DELAY_MS);
+    }
+
+    /**
+     * A phone already in accessory mode when the app starts is left from before: the car woke from standby, or killed
+     * the app (another source, the power button) during a session. Its attach was never delivered to this process,
+     * so nothing started it (it waited for a tap on the car), and its first session always failed (SSL_READ, the
+     * phone still in the old one). Resetting it makes it attach again like a fresh plug-in, which auto-starts it.
+     */
+    private void resetStaleAccessory(){
+        UsbDevice accessory = attachedAccessory();
+        if (accessory == null || seenAccessories_.contains(accessory.getDeviceName()) || ODAService.isSessionActive()) {
+            return;
+        }
+        if (Log.isInfo()) Log.i(TAG, "phone " + accessory.getDeviceName() + " still in accessory mode from before, resetting it");
+        libUsb_.createDevice(accessory, usbManager_).reset();
     }
 
     private final BroadcastReceiver usbReceiver_ = new BroadcastReceiver() {
@@ -163,6 +188,7 @@ public class USBManager {
             requestAOAP(device);
         } else {
             if (Log.isDebug()) Log.d(TAG, "Device is aoap");
+            seenAccessories_.add(device.getDeviceName());
             usbDevice_ = libUsb_.createDevice(device, usbManager_);
 
             if (Log.isDebug()) Log.d(TAG, "send local broadcast ATTACH_AOAP_DEVICE");
@@ -272,14 +298,22 @@ public class USBManager {
     }
 
     public void searchForAoapDevice(){
+        UsbDevice dev = attachedAccessory();
+        if (dev != null) {
+            usbDevice_ = libUsb_.createDevice(dev, usbManager_);
+        }
+    }
+
+    /** A phone already in accessory mode that we may open, or null. */
+    private UsbDevice attachedAccessory(){
         if (usbManager_.getDeviceList() != null) {
             for(UsbDevice dev : usbManager_.getDeviceList().values()){
                 if (checkAOAPDevice(dev) && usbManager_.hasPermission(dev)){
-                    usbDevice_ = libUsb_.createDevice(dev, usbManager_);
-                    return;
+                    return dev;
                 }
             }
         }
+        return null;
     }
 
     public boolean requestAOAP(UsbDevice device){

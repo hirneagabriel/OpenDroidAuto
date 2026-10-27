@@ -26,6 +26,8 @@ public:
     virtual bool init() = 0;
     virtual void write(aasdk::messenger::Timestamp::ValueType timestamp, const aasdk::common::DataConstBuffer& buffer) = 0;
     virtual void stop() = 0;
+    // frames received but still waiting for the decoder
+    virtual int framesWaiting() = 0;
     virtual aasdk::proto::enums::VideoFPS::Enum getVideoFPS() = 0;
     virtual aasdk::proto::enums::VideoResolution::Enum getVideoResolution() = 0;
     virtual size_t getScreenDPI() = 0;

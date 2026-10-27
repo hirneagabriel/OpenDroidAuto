@@ -6,6 +6,16 @@
 namespace service
 {
 
+// The phone sends the next frame only after the previous one is acknowledged (max_unacked 1). Acknowledging on
+// receipt let it run ahead of the decoder: at a steady 60 fps the car's decoder fell slowly behind and the frames
+// waiting for it grew without limit (3 to 33 in two minutes, 560 ms behind the phone). Above this many waiting the
+// ack is held until the decoder has caught up to cResumeFramesWaiting, so the phone sends fewer, newer frames.
+static constexpr int cMaxFramesWaiting = 8;
+static constexpr int cResumeFramesWaiting = 4;
+static constexpr int cBacklogCheckMs = 5;
+// never keep the phone waiting longer than this (a stuck decoder shouldn't look like a dead link to the phone)
+static constexpr int cMaxAckHoldMs = 1000;
+
 VideoService::VideoService(aasdk::io::ioService& ioService, aasdk::messenger::IMessenger::Pointer messenger, projection::IVideoOutput::Pointer videoOutput, IVideoEventHandler::Pointer eventHandler, IServiceEventHandler::Pointer serviceEventHandler)
         : strand_(ioService)
         , channel_(std::make_shared<aasdk::channel::av::VideoServiceChannel>(strand_, std::move(messenger)))
@@ -14,6 +24,7 @@ VideoService::VideoService(aasdk::io::ioService& ioService, aasdk::messenger::IM
         , serviceEventHandler_(serviceEventHandler)
         , session_(-1)
         , isRunning_(false)
+        , backlogTimer_(ioService)
 {
 
 }
@@ -40,6 +51,7 @@ void VideoService::stop()
 {
     if(Log::isInfo()) Log_i("Stop");
     isRunning_ = false;
+    backlogTimer_.cancel();
     videoOutput_->stop();
 }
 
@@ -87,6 +99,9 @@ void VideoService::onAVChannelStartIndication(const aasdk::proto::messages::AVCh
     if(Log::isDebug()) Log_d("start indication, session: %d", indication.session());
 
     session_ = indication.session();
+    // a new video session starts with nothing unacknowledged
+    backlogTimer_.cancel();
+    heldAcks_ = 0;
 
 //    channel_->receive(this->shared_from_this());
 }
@@ -105,9 +120,57 @@ void VideoService::onAVMediaWithTimestampIndication(aasdk::messenger::Timestamp:
 {
     videoOutput_->write(timestamp, buffer);
 
+    if (heldAcks_ > 0) {
+        // already holding (the phone sent another one anyway): ack it together with the held ones
+        heldAcks_++;
+        return;
+    }
+
+    int waiting = videoOutput_->framesWaiting();
+    if (waiting > cMaxFramesWaiting) {
+        if (Log::isDebug()) Log_d("decoder behind, %d frames waiting: holding the ack", waiting);
+        heldAcks_ = 1;
+        ackHeldSince_ = std::chrono::steady_clock::now();
+        scheduleBacklogCheck();
+    } else {
+        sendMediaAck(1);
+    }
+}
+
+void VideoService::scheduleBacklogCheck()
+{
+    backlogTimer_.expires_from_now(boost::posix_time::milliseconds(cBacklogCheckMs));
+    backlogTimer_.async_wait(strand_->wrap(std::bind(&VideoService::onBacklogCheck, this->shared_from_this(), std::placeholders::_1)));
+}
+
+void VideoService::onBacklogCheck(const boost::system::error_code& error)
+{
+    if (error == boost::asio::error::operation_aborted || !isRunning_) {
+        return;
+    }
+
+    auto heldMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - ackHeldSince_).count();
+    int waiting = videoOutput_->framesWaiting();
+    if (waiting > cResumeFramesWaiting && heldMs < cMaxAckHoldMs) {
+        scheduleBacklogCheck();
+        return;
+    }
+
+    if (heldMs >= cMaxAckHoldMs) {
+        if (Log::isWarn()) Log_w("decoder still %d frames behind after %lld ms, acking anyway", waiting, (long long) heldMs);
+    } else if (Log::isDebug()) {
+        Log_d("decoder caught up (%d waiting), ack held %lld ms", waiting, (long long) heldMs);
+    }
+    int frames = heldAcks_;
+    heldAcks_ = 0;
+    sendMediaAck(frames);
+}
+
+void VideoService::sendMediaAck(int frames)
+{
     aasdk::proto::messages::AVMediaAckIndication indication;
     indication.set_session(session_);
-    indication.set_value(1);
+    indication.set_value(frames);
 
     auto promise = aasdk::channel::SendPromise::defer(strand_, "VideoService_avMediaAck");
     promise->then([]() {}, std::bind(&VideoService::onChannelError, this->shared_from_this(), std::placeholders::_1));

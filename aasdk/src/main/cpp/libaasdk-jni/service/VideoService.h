@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <chrono>
+#include <boost/asio/deadline_timer.hpp>
 #include "channel/av/VideoServiceChannel.hpp"
 #include "channel/av/IVideoServiceChannelEventHandler.hpp"
 #include "projection/IVideoOutput.h"
@@ -35,6 +37,9 @@ private:
     using std::enable_shared_from_this<VideoService>::shared_from_this;
     void sendVideoFocusIndication();
     void sendVideoFocusReleaseIndication();
+    void sendMediaAck(int frames);
+    void scheduleBacklogCheck();
+    void onBacklogCheck(const boost::system::error_code& error);
 
     aasdk::io::strand strand_;
     aasdk::channel::av::VideoServiceChannel::Pointer channel_;
@@ -43,6 +48,10 @@ private:
     service::IVideoEventHandler::Pointer eventHandler_;
     IServiceEventHandler::Pointer serviceEventHandler_;
     bool isRunning_;
+    // holds the ack of the phone's last frame while the decoder is behind (on strand_)
+    boost::asio::deadline_timer backlogTimer_;
+    std::chrono::steady_clock::time_point ackHeldSince_;
+    int heldAcks_ = 0;
 };
 
 }

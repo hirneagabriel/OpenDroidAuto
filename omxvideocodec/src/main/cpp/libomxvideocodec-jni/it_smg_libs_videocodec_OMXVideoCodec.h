@@ -21,6 +21,7 @@ public:
     void setSps(common::DataConstBuffer &b);
     void takeStats(uint32_t& rendered, int& maxQueued, int64_t& latencyAvgUs, int64_t& latencyMaxUs);
     void takeStages(int64_t out[]);
+    int queuedFrames();
 
     ~JOMXVideoCodec();
 protected:
