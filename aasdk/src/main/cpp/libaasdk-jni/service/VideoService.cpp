@@ -150,6 +150,10 @@ void VideoService::fillFeatures(aasdk::proto::messages::ServiceDiscoveryResponse
     videoConfig1->set_margin_height(videoMargins.height);
     videoConfig1->set_margin_width(videoMargins.width);
     videoConfig1->set_dpi(videoOutput_->getScreenDPI());
+    // the fps enum names are swapped (see JVideoOutput::getVideoFPS): 1 is 60 fps, 2 is 30 fps
+    if(Log::isInfo()) Log_i("video config sent: resolution %s, fps %d (protocol value %d), dpi %d",
+                            aasdk::proto::enums::VideoResolution::Enum_Name(videoConfig1->video_resolution()).c_str(),
+                            videoConfig1->video_fps() == 1 ? 60 : 30, videoConfig1->video_fps(), videoConfig1->dpi());
 
     if(Log::isVerbose() && Log::logProtocol()) Log_v("%s", channelDescriptor->Utf8DebugString().c_str());
 }

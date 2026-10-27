@@ -3,7 +3,9 @@ package it.smg.hu.config;
 import android.os.Environment;
 import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
@@ -65,6 +67,7 @@ public class ODALog implements ILog {
         if (logProcess_ != null){
             _deInit();
         }
+        killOrphanLogcats();
 
         if (settings_.advanced.enabledDebug()) {
             v_(TAG, "log enabled");
@@ -108,6 +111,53 @@ public class ODALog implements ILog {
             } else {
                 w_(TAG, "log storage not accessible");
             }
+        }
+    }
+
+    /**
+     * Kills the logcat processes earlier runs of the app left behind. logcat is a child process: when the app is
+     * killed (the car force-stops it when another source starts, or it crashes) it keeps running and writing its
+     * file, and every new run adds one more (9 at once on the car). They run as our uid, so we may kill them.
+     */
+    private void killOrphanLogcats(){
+        int myUid = android.os.Process.myUid();
+        File[] procs = new File("/proc").listFiles();
+        if (procs == null) return;
+
+        for (File proc : procs) {
+            String name = proc.getName();
+            if (!Character.isDigit(name.charAt(0))) continue;
+            int pid = Integer.parseInt(name);
+            if (pid == android.os.Process.myPid()) continue;
+
+            String cmdline = readFirstLine(new File(proc, "cmdline"));
+            if (cmdline == null || !cmdline.contains("logcat ") || !cmdline.contains("/logs/logcat_")) continue;
+            if (uidOf(proc) != myUid) continue;
+
+            w_(TAG, "killing logcat " + pid + " left by an earlier run");
+            android.os.Process.killProcess(pid);
+        }
+    }
+
+    private static int uidOf(File proc){
+        try (BufferedReader reader = new BufferedReader(new FileReader(new File(proc, "status")))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("Uid:")) {
+                    return Integer.parseInt(line.substring(4).trim().split("\\s+")[0]);
+                }
+            }
+        } catch (IOException | RuntimeException ignored) {}
+        return -1;
+    }
+
+    private static String readFirstLine(File file){
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line = reader.readLine();
+            // cmdline separates the arguments with NULs
+            return line != null ? line.replace('\0', ' ') : null;
+        } catch (IOException ignored) {
+            return null;
         }
     }
 

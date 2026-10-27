@@ -56,15 +56,18 @@ void AndroidAutoEntity::stop()
 }
 
 void AndroidAutoEntity::sendShutdownRequest() {
-    if(Log::isInfo()) Log_i("Shutdown request");
+    // called from Java: send on the strand like every other control message. The phone's ShutdownResponse
+    // arrives in onShutdownResponse and ends the session through triggerQuit.
+    strand_->dispatch([this, self = this->shared_from_this()]() {
+        if(Log::isInfo()) Log_i("sending shutdown request");
 
-    aasdk::proto::messages::ShutdownRequest shutdownRequest;
-    shutdownRequest.set_reason(aasdk::proto::enums::ShutdownReason::QUIT);
+        aasdk::proto::messages::ShutdownRequest shutdownRequest;
+        shutdownRequest.set_reason(aasdk::proto::enums::ShutdownReason::QUIT);
 
-    auto sendShutdownRequestPromise = aasdk::channel::SendPromise::defer(strand_, "AndroidAutoEntity_shutdown");
-    sendShutdownRequestPromise->then([]() {}, std::bind(&AndroidAutoEntity::onChannelError, this->shared_from_this(), std::placeholders::_1));
-    controlServiceChannel_->sendShutdownRequest(shutdownRequest, std::move(sendShutdownRequestPromise));
-//    controlServiceChannel_->receive(this->shared_from_this());
+        auto sendShutdownRequestPromise = aasdk::channel::SendPromise::defer(strand_, "AndroidAutoEntity_shutdown");
+        sendShutdownRequestPromise->then([]() {}, std::bind(&AndroidAutoEntity::onChannelError, this->shared_from_this(), std::placeholders::_1));
+        controlServiceChannel_->sendShutdownRequest(shutdownRequest, std::move(sendShutdownRequestPromise));
+    });
 }
 
 void AndroidAutoEntity::onVersionResponse(uint16_t majorCode, uint16_t minorCode, aasdk::proto::enums::VersionResponseStatus::Enum status)

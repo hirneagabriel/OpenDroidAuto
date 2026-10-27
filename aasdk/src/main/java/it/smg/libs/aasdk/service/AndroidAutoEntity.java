@@ -67,6 +67,11 @@ public class AndroidAutoEntity implements IAndroidAutoEntity {
         stop();
     }
 
+    /** Asks the phone to end the session; its answer arrives as onAndroidAutoQuit. */
+    public void requestShutdown(){
+        nativeRequestShutdown();
+    }
+
     @Override
     public void start(IAndroidAutoEntityEventHandler eventHandler) {
         if (Log.isInfo()) Log.i(TAG, "start");

@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -71,22 +72,26 @@ public class MainActivity extends FragmentActivity {
             isOpenFromMain_ = false;
             isOpenFromUsb_ = true;
         } else if (Intent.ACTION_MAIN.equalsIgnoreCase(intent.getAction())) {
-            showWallpaper();
-
-            HomeFragment f = new HomeFragment();
-            Bundle args = new Bundle();
-            args.putBoolean(HomeFragment.AUTOSTART, true);
-            f.setArguments(args);
-
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.home_content, f)
-                    .commit();
-
-            isOpenFromMain_ = true;
-            isOpenFromUsb_ = false;
+            showHome();
         }
 
+    }
+
+    private void showHome(){
+        showWallpaper();
+
+        HomeFragment f = new HomeFragment();
+        Bundle args = new Bundle();
+        args.putBoolean(HomeFragment.AUTOSTART, true);
+        f.setArguments(args);
+
+        getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.home_content, f)
+                .commit();
+
+        isOpenFromMain_ = true;
+        isOpenFromUsb_ = false;
     }
 
     /**
@@ -155,6 +160,10 @@ public class MainActivity extends FragmentActivity {
         if ( UsbManager.ACTION_USB_DEVICE_ATTACHED.equalsIgnoreCase(intent.getAction())) {
             if (Log.isInfo()) Log.i(TAG, "attached new device, keep intent");
             newUsbDeviceIntent_ = intent;
+        } else if (Intent.ACTION_MAIN.equalsIgnoreCase(intent.getAction()) && !isOpenFromMain_) {
+            // opened invisibly for a USB attach, now asked for the home page (Back from Android Auto, launcher icon)
+            getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            showHome();
         }
     }
 
@@ -229,8 +238,18 @@ public class MainActivity extends FragmentActivity {
     private boolean doubleBackToExitPressedOnce = false;
 
     public void exitApp(){
-        Intent service = new Intent(this, ODAService.class);
-        stopService(service);
+        // Exit means off: don't let the phone's re-attach after the session ends start Android Auto again
+        USBManager.instance().pauseAutoStart(10000);
+        if (ODAService.isSessionActive()) {
+            // Android Auto may be running in the background (Back from it): end it properly first, the service
+            // stops itself when the session is gone. Stopping the service under it left a running session behind.
+            Intent quit = new Intent(this, ODAService.class);
+            quit.setAction(ODAService.ACTION_QUIT);
+            startService(quit);
+        } else {
+            Intent service = new Intent(this, ODAService.class);
+            stopService(service);
+        }
 
         Log.shutdown();
 

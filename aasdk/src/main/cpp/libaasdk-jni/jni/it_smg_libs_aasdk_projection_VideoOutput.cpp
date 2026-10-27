@@ -62,13 +62,10 @@ void JVideoOutput::stop() {
 aasdk::proto::enums::VideoFPS::Enum JVideoOutput::getVideoFPS() {
     JNIEnv* env = getJniEnv();
     jint ret = env->CallIntMethod(androidClass_, getVideoFPSMethodId_);
-    //TODO: try to cast
-    switch (ret) {
-        case aasdk::proto::enums::VideoFPS_Enum__60:
-            return aasdk::proto::enums::VideoFPS_Enum__60;
-        default:
-            return aasdk::proto::enums::VideoFPS_Enum__30;
-    }
+    // Java returns frames per second (30 or 60). aasdk's enum has the two values the wrong way round: phones read
+    // 1 (named _30) as 60 fps and 2 (named _60) as 30 fps. Measured on the car: asked for 1 the phone sent up to
+    // 60 fps, asked for 2 it never went above 30.
+    return ret >= 60 ? aasdk::proto::enums::VideoFPS_Enum__30 : aasdk::proto::enums::VideoFPS_Enum__60;
 }
 
 aasdk::proto::enums::VideoResolution::Enum JVideoOutput::getVideoResolution() {

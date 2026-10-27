@@ -71,6 +71,10 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
         }
 
         surfaceView_ = findViewById(R.id.surfaceView);
+
+        // registered for the whole life of the screen, not just while visible: in the background (Back) it must
+        // still hear that the session ended, or it comes back later over a session that is gone
+        initReceivers();
     }
 
     @Override
@@ -89,27 +93,30 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
         outState.putBoolean("isRunning", isRunning_);
     }
 
+    /** Back goes to the app's home page and keeps the session running; the Android Auto tile comes back to it. */
     @Override
     public void onBackPressed() {
-        if (Log.isDebug()) Log.d(TAG, "onBackPressed");
+        if (Log.isInfo()) Log.i(TAG, "Back pressed, Android Auto keeps running in the background");
 
-        if (Settings.instance().advanced.hondaIntegrationEnabled()){
-            HondaConnectManager.instance().endAudioBinding();
-        }
-
-        odaService_.stop();
+        Intent home = new Intent(this, MainActivity.class);
+        home.setAction(Intent.ACTION_MAIN);
+        home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(home);
     }
 
+    /** A long press on Back ends Android Auto. */
     @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (Log.isInfo()) Log.i(TAG, "Back button long pressed");
+            if (Log.isInfo()) Log.i(TAG, "Back button long pressed, ending Android Auto");
 
             if (Settings.instance().advanced.hondaIntegrationEnabled()){
                 HondaConnectManager.instance().endAudioBinding();
             }
 
-            odaService_.stop();
+            if (odaService_ != null) {
+                odaService_.quit();
+            }
             return true;
         }
         return super.onKeyLongPress(keyCode, event);
@@ -131,7 +138,6 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
         NotificationFactory.instance().dismissAll();
         AppBadge.instance().dismiss();
 
-        initReceivers();
         isActive_ = true;
     }
 
@@ -151,7 +157,6 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
 
         AppBadge.instance().show();
 
-        localBroadcastManager_.unregisterReceiver(localReceiver_);
         isActive_ = false;
     }
 
@@ -187,6 +192,7 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
     protected void onDestroy() {
         super.onDestroy();
         if (Log.isDebug()) Log.d(TAG, "onDestroy");
+        localBroadcastManager_.unregisterReceiver(localReceiver_);
     }
 
     private void initReceivers(){
@@ -218,8 +224,17 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
 
         isServiceBound_ = true;
 
-        if (isRunning_){
+        if (isRunning_ && !ODAService.isSessionActive()) {
+            // the session ended while this screen was in the background (exit from the home page, phone unplugged)
+            if (Log.isInfo()) Log.i(TAG, "session ended while in the background, closing");
+            finish();
+        } else if (isRunning_){
             odaService_.gainFocus();
+        } else if (ODAService.isSessionActive()) {
+            // the session was started by a screen that is gone (destroyed by the system): its video and touch are
+            // bound to that screen's surface, so end it; the phone re-attaches and the known-phone auto-start reconnects
+            if (Log.isWarn()) Log.w(TAG, "a session is already running without its screen, restarting it");
+            odaService_.quit();
         } else {
             start();
         }
@@ -267,7 +282,7 @@ public class PlayerActivity extends Activity implements ServiceConnection, Surfa
             if (ODAService.STOP_ACTION.equalsIgnoreCase(intent.getAction())){
                 finish();
 
-            } else if (ODAService.STOP_VIDEO_INDICATION.equalsIgnoreCase(intent.getAction())){
+            } else if (ODAService.STOP_VIDEO_INDICATION.equalsIgnoreCase(intent.getAction()) && isActive_){
                 moveTaskToBack(true);
             }
         }

@@ -9,12 +9,16 @@ import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.SystemClock;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +42,9 @@ public class USBManager {
     private static final int ACC_REQ_SEND_STRING  = 52;
     private static final int ACC_REQ_START        = 53;
 
+    // Version, URI and serial are sent at index 0 (manufacturer), not 3/4/5 as the AOA spec says, so the phone
+    // ends up seeing manufacturer "HU-AAAAAA001". The spec-correct identity (2.6.7) made the phone stop answering
+    // after the switch (USB_TRANSFER timeout on the version request); this is the identity it has always accepted.
     private static final String MANUFACTURER = "Android";
     private static final String MODEL = "Android Auto";
     private static final String DESC = "Android Auto";
@@ -61,6 +68,8 @@ public class USBManager {
     // switching a phone to accessory mode and opening it block on USB control transfers: keep them off the main thread
     private final ExecutorService usbExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODA USB"));
     private final LocalBroadcastManager localBroadcastManager_;
+    // SystemClock.elapsedRealtime() until which a known phone is not started automatically
+    private volatile long autoStartPausedUntil_;
 
     private static USBManager instance_;
     private LibUsb libUsb_;
@@ -103,7 +112,8 @@ public class USBManager {
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(intent.getAction())) {
                 // the phone's first enumeration also detaches when it switches to accessory mode; only the accessory matters
-                if (usbDevice_ != null && usbDevice_.originalDevice().getDeviceName().equals(device.getDeviceName())) {
+                LibUsbDevice current = usbDevice_;
+                if (current != null && current.originalDevice().getDeviceName().equals(device.getDeviceName())) {
                     if (Log.isInfo()) Log.i(TAG, "aoap device detached");
                     usbDevice_ = null;
                     localBroadcastManager_.sendBroadcast(new Intent(DETACH_AOAP_DEVICE));
@@ -128,6 +138,13 @@ public class USBManager {
 
     private boolean checkDeviceNow(UsbDevice device){
         if (Log.isInfo()) Log.i(TAG, "checkDevice");
+
+        // ending a session resets the phone's USB, which queues attach intents for devices that are gone by the time
+        // they are checked; asking permission for one of those put the system's USB dialog on the car's screen
+        if (!usbManager_.getDeviceList().containsKey(device.getDeviceName())) {
+            if (Log.isInfo()) Log.i(TAG, "device " + device.getDeviceName() + " is already gone, ignoring it");
+            return false;
+        }
 
         // launched by USB_DEVICE_ATTACHED the system has already granted it; otherwise ask, and continue in usbReceiver_
         boolean deviceHasPermission = usbManager_.hasPermission(device);
@@ -154,7 +171,9 @@ public class USBManager {
             localBroadcastManager_.sendBroadcast(aoapDeviceIntent);
             ConnectionWidget.refresh(ctx_);
 
-            if (isKnownDevice() && !ODAService.isSessionActive()) {
+            if (isKnownDevice() && !ODAService.isSessionActive() && SystemClock.elapsedRealtime() < autoStartPausedUntil_) {
+                if (Log.isInfo()) Log.i(TAG, "known phone, but Android Auto was just exited: not starting it");
+            } else if (isKnownDevice() && !ODAService.isSessionActive()) {
                 if (Log.isInfo()) Log.i(TAG, "known phone, starting Android Auto");
                 Intent i = new Intent(ctx_, PlayerActivity.class);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
@@ -166,21 +185,69 @@ public class USBManager {
         return isAoap;
     }
 
+    /**
+     * Stops known phones from starting Android Auto by themselves for a while. Ending a session resets the phone's
+     * USB, and it re-attaches within ~3 s; after an Exit that must not start it again. A later replug still does.
+     */
+    public void pauseAutoStart(long ms){
+        autoStartPausedUntil_ = SystemClock.elapsedRealtime() + ms;
+    }
+
     /** Whether the current accessory is a phone that has run Android Auto here before. */
     public boolean isKnownDevice(){
-        return usbDevice_ != null && Settings.instance().connectivity.isKnownDevice(deviceId(usbDevice_));
+        LibUsbDevice current = usbDevice_;
+        return current != null && Settings.instance().connectivity.isKnownDevice(deviceId(current));
+    }
+
+    /**
+     * The phone's USB link speed from sysfs, matched by bus and device number ("480" Mbit/s is high speed, "12"
+     * full speed), or null if it can't be read. The car's port speed caps how much video the phone can send.
+     */
+    public static String linkSpeed(UsbDevice device){
+        // device names are /dev/bus/usb/<bus>/<device>
+        String[] parts = device.getDeviceName().split("/");
+        if (parts.length < 2) return null;
+        try {
+            int bus = Integer.parseInt(parts[parts.length - 2]);
+            int dev = Integer.parseInt(parts[parts.length - 1]);
+            File[] devices = new File("/sys/bus/usb/devices").listFiles();
+            if (devices == null) return null;
+            for (File d : devices) {
+                String busnum = readSysfs(new File(d, "busnum"));
+                String devnum = readSysfs(new File(d, "devnum"));
+                if (busnum != null && devnum != null && Integer.parseInt(busnum) == bus && Integer.parseInt(devnum) == dev) {
+                    String speed = readSysfs(new File(d, "speed"));
+                    String version = readSysfs(new File(d, "version"));
+                    return speed + " Mbit/s (USB " + (version != null ? version : "?") + ", " + d.getName() + ")";
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "can't read the USB link speed", e);
+        }
+        return null;
+    }
+
+    private static String readSysfs(File file){
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line = reader.readLine();
+            return line != null ? line.trim() : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     public LibUsbDevice aoapDevice(){
-        // the detach broadcast can be missed (seen on the car), so check the phone is still plugged in
-        HashMap<String, UsbDevice> attached = usbDevice_ != null ? usbManager_.getDeviceList() : null;
-        if (attached != null && !attached.containsKey(usbDevice_.originalDevice().getDeviceName())) {
+        // the detach broadcast can be missed (seen on the car), so check the phone is still plugged in.
+        // Read the field once: the USB thread can replace or clear it meanwhile.
+        LibUsbDevice current = usbDevice_;
+        if (current != null && !usbManager_.getDeviceList().containsKey(current.originalDevice().getDeviceName())) {
             if (Log.isInfo()) Log.i(TAG, "aoap device no longer attached");
             usbDevice_ = null;
             localBroadcastManager_.sendBroadcast(new Intent(DETACH_AOAP_DEVICE));
             ConnectionWidget.refresh(ctx_);
+            return null;
         }
-        return usbDevice_;
+        return current;
     }
 
     private boolean checkAOAPDevice(UsbDevice device){
@@ -260,7 +327,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Version " + VERSION);
                 buffer = (VERSION + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 3, buffer, buffer.length, AOAP_TIMEOUT_MS);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Version, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -268,7 +335,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send URI " + URI);
                 buffer = (URI + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 4, buffer, buffer.length, AOAP_TIMEOUT_MS);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Manufacter, len= " + len + " expected= " + buffer.length);
                     return false;
@@ -276,7 +343,7 @@ public class USBManager {
 
                 if (Log.isDebug()) Log.d(TAG, "Send Serial " + SERIAL);
                 buffer = (SERIAL + "\0").getBytes();
-                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 5, buffer, buffer.length, AOAP_TIMEOUT_MS);
+                len = usbConnection.controlTransfer(UsbConstants.USB_DIR_OUT | UsbConstants.USB_TYPE_VENDOR, ACC_REQ_SEND_STRING, 0, 0, buffer, buffer.length, AOAP_TIMEOUT_MS);
                 if (len != buffer.length) {
                     Log.e(TAG, "Error sending Serial, len= " + len + " expected= " + buffer.length);
                     return false;
