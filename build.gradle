@@ -9,8 +9,8 @@ ext {
     compileSdk = 34
     minSdk = 15
     targetSdk = 15
-    versionCode = 200607 // major (x)-minor (xxx)-fix (xx)
-    versionName =  "2.6.7"
+    versionCode = 200608 // major (x)-minor (xxx)-fix (xx)
+    versionName =  "2.6.8"
     SupportedABIs = (findProperty('abis') ?: 'armeabi-v7a').split(',') as List // e.g. -Pabis=x86 for the emulator
     ndkVersion = '17.2.4988734'
 }

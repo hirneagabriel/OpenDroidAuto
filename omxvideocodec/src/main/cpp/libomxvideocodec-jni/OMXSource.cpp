@@ -138,6 +138,11 @@ int OMXSource::takeMaxQueued(){
     return max;
 }
 
+int OMXSource::queuedFrames(){
+    std::unique_lock<std::mutex> l(mutex_);
+    return (int) pbuffers_.size();
+}
+
 void OMXSource::queueBuffer(MediaBuffer* buffer){
     if (Log::isVerbose()) Log_v("add buffer to queue");
     std::unique_lock<std::mutex> l(mutex_);

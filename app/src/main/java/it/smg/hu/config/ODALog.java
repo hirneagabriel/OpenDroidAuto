@@ -1,13 +1,21 @@
 package it.smg.hu.config;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Environment;
 import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import it.smg.libs.common.ILog;
 
@@ -19,7 +27,13 @@ public class ODALog implements ILog {
     private final Settings settings_;
     // restarting logcat sleeps ~1.8 s; reload() and shutdown() are called from the UI, so do it off the main thread
     private final ExecutorService logcatExecutor_ = Executors.newSingleThreadExecutor(r -> new Thread(r, "ODALog"));
-    private Process logProcess_;
+    private volatile Process logProcess_;
+    // the car keeps writes to the stick in memory for up to ~30 s and loses them when it hangs or loses power (a
+    // whole drive's log and stats were missing after the unit hung), so flush them while logging
+    private static final long SYNC_INTERVAL_S = 1;
+    private ScheduledExecutorService syncExecutor_;
+    // waits on logcatExecutor_ for the log dir: after the car wakes up the app can start before the USB stick is mounted
+    private static final long WAIT_FOR_LOG_DIR_MS = 120000;
     private int logLevel_;
     private boolean logProtocol_;
 
@@ -28,7 +42,9 @@ public class ODALog implements ILog {
         setLogLevel_(settings_.advanced.logLevel());
         setLogProtocol_(settings_.advanced.logProtocol());
 
-        initProcessLog();
+        // keep what the buffer still holds: after the car wakes up or the app was killed, it is the only record of
+        // how the previous run ended (a leftover phone's SSL_READ was wiped by clearing it here)
+        initProcessLog(false, true);
     }
 
     @Override
@@ -62,9 +78,18 @@ public class ODALog implements ILog {
     }
 
     private void initProcessLog(){
+        initProcessLog(true, true);
+    }
+
+    /**
+     * @param clear empty logcat's buffer first, so the new file doesn't repeat the previous one
+     * @param waitForDir if the log dir isn't there yet, start logging when it appears
+     */
+    private void initProcessLog(boolean clear, boolean waitForDir){
         if (logProcess_ != null){
             _deInit();
         }
+        killOrphanLogcats();
 
         if (settings_.advanced.enabledDebug()) {
             v_(TAG, "log enabled");
@@ -74,6 +99,10 @@ public class ODALog implements ILog {
 
                 if (!extStoragePath.trim().isEmpty()) {
                     File extStorageDir = new File(extStoragePath);
+                    if (!extStorageDir.exists() && waitForDir) {
+                        w_(TAG, "log dir " + extStorageDir + " not there yet, waiting for it");
+                        logcatExecutor_.execute(() -> waitForLogDir(extStorageDir));
+                    }
                     if (extStorageDir.exists()){
                         File logDirectory = new File(extStorageDir, "logs");
                         File logFile = new File(logDirectory, "logcat_" + System.currentTimeMillis() + ".txt");
@@ -86,15 +115,20 @@ public class ODALog implements ILog {
                             }
                         }
 
+                        copyCrashReports(logDirectory);
+
                         // clear the previous logcat and then write the new one to the file
                         try {
                             v_(TAG, "start logcat process");
-                            Runtime.getRuntime().exec("logcat -c");
-                            Thread.sleep(100);
+                            if (clear) {
+                                Runtime.getRuntime().exec("logcat -c");
+                                Thread.sleep(100);
+                            }
                             String cmd = "logcat -v threadtime -f " + logFile + " " + PACKAGE_NAME + ":V";
                             logProcess_ = Runtime.getRuntime().exec(cmd);
                             Thread.sleep(200);
                             v_(TAG, "started log process with cmd: " + cmd);
+                            startSyncing();
                         } catch (IOException e) {
                             e_(TAG, "error in start log process", e);
                             _deInit();
@@ -111,6 +145,119 @@ public class ODALog implements ILog {
         }
     }
 
+    private synchronized void startSyncing(){
+        if (syncExecutor_ != null) return;
+        final Process shell;
+        try {
+            // one shell fed "sync" each second: cheaper than starting a process from the app every time, and it
+            // exits by itself (end of input) when the app is killed, unlike logcat
+            shell = Runtime.getRuntime().exec("sh");
+        } catch (IOException e) {
+            w_(TAG, "can't start syncing the log", e);
+            return;
+        }
+        final java.io.OutputStream commands = shell.getOutputStream();
+        syncExecutor_ = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ODALog sync"));
+        syncExecutor_.scheduleWithFixedDelay(() -> {
+            if (logProcess_ == null) return;
+            try {
+                commands.write("sync\n".getBytes());
+                commands.flush();
+            } catch (IOException ignored) {}
+        }, SYNC_INTERVAL_S, SYNC_INTERVAL_S, TimeUnit.SECONDS);
+    }
+
+    private void waitForLogDir(File dir){
+        long deadline = System.currentTimeMillis() + WAIT_FOR_LOG_DIR_MS;
+        try {
+            while (!dir.exists() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(2000);
+            }
+        } catch (InterruptedException e) {
+            return;
+        }
+        if (dir.exists() && logProcess_ == null) {
+            i_(TAG, "log dir " + dir + " appeared, starting the log");
+            initProcessLog(false, false);
+        }
+    }
+
+    /**
+     * Copies the system's crash reports to the stick, once each: the car's logcat is wiped when it restarts, but
+     * these survive it. traces.txt holds the thread dumps of the last ANR or system watchdog (a hung system shows
+     * as no sound, a black screen, then the boot logo).
+     */
+    private void copyCrashReports(File logDirectory){
+        copyOnce(new File("/data/anr/traces.txt"), logDirectory, "anr_traces_");
+        copyOnce(new File("/proc/last_kmsg"), logDirectory, "last_kmsg_");
+    }
+
+    private void copyOnce(File source, File logDirectory, String prefix){
+        if (!source.canRead()) return;
+        // /proc files have no meaningful time or size: name those by today's first copy only
+        long stamp = source.lastModified();
+        File target = new File(logDirectory, prefix + (stamp > 0 ? stamp : System.currentTimeMillis() / 86400000L) + ".txt");
+        if (target.exists()) return;
+        try (java.io.InputStream in = new java.io.FileInputStream(source);
+             java.io.OutputStream out = new java.io.FileOutputStream(target)) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) > 0) {
+                out.write(buffer, 0, n);
+            }
+            i_(TAG, "copied " + source + " to " + target);
+        } catch (IOException e) {
+            w_(TAG, "can't copy " + source, e);
+        }
+    }
+
+    /**
+     * Kills the logcat processes earlier runs of the app left behind. logcat is a child process: when the app is
+     * killed (the car force-stops it when another source starts, or it crashes) it keeps running and writing its
+     * file, and every new run adds one more (9 at once on the car). They run as our uid, so we may kill them.
+     */
+    private void killOrphanLogcats(){
+        int myUid = android.os.Process.myUid();
+        File[] procs = new File("/proc").listFiles();
+        if (procs == null) return;
+
+        for (File proc : procs) {
+            String name = proc.getName();
+            if (!Character.isDigit(name.charAt(0))) continue;
+            int pid = Integer.parseInt(name);
+            if (pid == android.os.Process.myPid()) continue;
+
+            String cmdline = readFirstLine(new File(proc, "cmdline"));
+            if (cmdline == null || !cmdline.contains("logcat ") || !cmdline.contains("/logs/logcat_")) continue;
+            if (uidOf(proc) != myUid) continue;
+
+            w_(TAG, "killing logcat " + pid + " left by an earlier run");
+            android.os.Process.killProcess(pid);
+        }
+    }
+
+    private static int uidOf(File proc){
+        try (BufferedReader reader = new BufferedReader(new FileReader(new File(proc, "status")))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("Uid:")) {
+                    return Integer.parseInt(line.substring(4).trim().split("\\s+")[0]);
+                }
+            }
+        } catch (IOException | RuntimeException ignored) {}
+        return -1;
+    }
+
+    private static String readFirstLine(File file){
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line = reader.readLine();
+            // cmdline separates the arguments with NULs
+            return line != null ? line.replace('\0', ' ') : null;
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
     /* Checks if external storage is available for read and write */
     private boolean isExternalStorageWritable() {
         String state = Environment.getExternalStorageState();
@@ -123,11 +270,48 @@ public class ODALog implements ILog {
         return Environment.MEDIA_MOUNTED.equals(state) || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
     }
 
+    /**
+     * Stops writing to the stick when it goes away and starts again when it is back. The car drops and re-detects
+     * the stick when it wakes from standby; vold then kills every process with a file open on it (logcat, and the
+     * app with it, ~1 min into the session), and only remounts the stick after that.
+     */
+    public void watchStorage(Context ctx){
+        IntentFilter filter = new IntentFilter(Intent.ACTION_MEDIA_MOUNTED);
+        filter.addAction(Intent.ACTION_MEDIA_EJECT);
+        filter.addAction(Intent.ACTION_MEDIA_BAD_REMOVAL);
+        filter.addAction(Intent.ACTION_MEDIA_UNMOUNTED);
+        filter.addDataScheme("file");
+        ctx.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String mountPath = intent.getData().getPath();
+                String logDir = new File(settings_.advanced.logDir()).getAbsolutePath();
+                if (!logDir.equals(mountPath) && !logDir.startsWith(mountPath + "/")) {
+                    return;
+                }
+                if (Intent.ACTION_MEDIA_MOUNTED.equals(intent.getAction())) {
+                    // keep the buffer: it holds what happened while the stick was away
+                    logcatExecutor_.execute(() -> {
+                        if (logProcess_ == null) initProcessLog(false, false);
+                    });
+                } else if (logProcess_ != null) {
+                    w_(TAG, "log dir " + logDir + " going away (" + intent.getAction() + "), stopping the log");
+                    logcatExecutor_.execute(() -> _deInit(false));
+                }
+            }
+        }, filter);
+    }
+
     private void _deInit(){
+        _deInit(true);
+    }
+
+    /** @param drain give logcat time to write what it has read; pointless when its file is already gone */
+    private void _deInit(boolean drain){
         if (logProcess_ != null){
             try {
                 v_(TAG, "Destroy log process");
-                Thread.sleep(1500);
+                if (drain) Thread.sleep(1500);
                 logProcess_.destroy();
                 v_(TAG, "Log process destroyed");
                 logProcess_ = null;

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 #include <boost/asio.hpp>
 #include <usb/IUSBEndpoint.hpp>
 #include "LibUsbDevice.h"
@@ -32,6 +33,8 @@ private:
     LibUsbDevice::Pointer libUsbDevice_;
     aasdk::io::strand strand_;
     uint8_t endpointAddress_;
+    // cancelTransfers() runs on the session's stop thread while completions are handled on the strand
+    std::mutex transfersMutex_;
     Transfers transfers_;
 };
 

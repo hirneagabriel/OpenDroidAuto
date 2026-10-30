@@ -79,6 +79,8 @@ public class ResourceMonitor {
     private static final Charset US_ASCII = Charset.forName("US-ASCII");
     private Handler handler_;
     private PrintWriter csv_;
+    // the stick sampling wrote to went away: start again when it is back
+    private boolean restartOnMount_;
     private File outputDir_;
 
     private long startUptime_;
@@ -112,6 +114,9 @@ public class ResourceMonitor {
         activityManager_ = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
 
         IntentFilter mountFilter = new IntentFilter(Intent.ACTION_MEDIA_MOUNTED);
+        mountFilter.addAction(Intent.ACTION_MEDIA_EJECT);
+        mountFilter.addAction(Intent.ACTION_MEDIA_BAD_REMOVAL);
+        mountFilter.addAction(Intent.ACTION_MEDIA_UNMOUNTED);
         mountFilter.addDataScheme("file");
         ctx.registerReceiver(mountReceiver_, mountFilter);
     }
@@ -119,13 +124,39 @@ public class ResourceMonitor {
     private final BroadcastReceiver mountReceiver_ = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (Log.isInfo()) Log.i(TAG, "media mounted: " + intent.getData());
-            switchToLogDir();
+            if (Log.isInfo()) Log.i(TAG, intent.getAction() + ": " + intent.getData());
+            if (Intent.ACTION_MEDIA_MOUNTED.equals(intent.getAction())) {
+                switchToLogDir();
+            } else {
+                storageRemoved(intent.getData().getPath());
+            }
         }
     };
 
-    /** Restarts on the USB stick if it was mounted after sampling started on the device storage. */
+    /**
+     * Closes the stats file when the stick it is on goes away. The car drops and re-detects the stick when it wakes
+     * from standby, and after ~1 min of retries vold kills every process with a file open on it, Android Auto
+     * session included, before it remounts the stick. Sampling starts again on the remount.
+     */
+    private synchronized void storageRemoved(String path){
+        if (outputDir_ != null && isUnder(outputDir_, path)){
+            stop();
+            restartOnMount_ = true;
+        }
+    }
+
+    private static boolean isUnder(File file, String mountPath){
+        String p = file.getAbsolutePath();
+        return p.equals(mountPath) || p.startsWith(mountPath + "/");
+    }
+
+    /** Restarts on the USB stick if it was mounted after sampling started on the device storage, or was dropped. */
     private synchronized void switchToLogDir(){
+        if (restartOnMount_){
+            restartOnMount_ = false;
+            update();
+            return;
+        }
         if (thread_ == null || isLogDirOutput()){
             return;
         }

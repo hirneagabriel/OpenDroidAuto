@@ -252,7 +252,7 @@ public class Settings {
         public final static String VIDEO_DECODER_RELEASE_EARLY = "video_decoder_release_early";
 
         public final static int VIDEO_RESOLUTION_DEFAULT_VALUE = 1; // 480p
-        public final static int VIDEO_FPS_DEFAULT_VALUE = 1; // 30 fps
+        public final static int VIDEO_FPS_DEFAULT_VALUE = 2; // 60 fps: what the phone always got before the fps request was fixed
         public final static int VIDEO_DPI_DEFAULT_VALUE = 140;
         public final static String VIDEO_MARGIN_DEFAULT_VALUE = "0,0";
         public final static String VIDEO_NIGHT_MODE_DEFAULT_VALUE = ""; //IDayNightSensor.TIME_GPS;

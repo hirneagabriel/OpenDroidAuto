@@ -12,8 +12,10 @@ import android.widget.Toast;
 
 import androidx.annotation.Keep;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import it.smg.hu.R;
@@ -37,6 +39,8 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     public static final String STOP_ACTION = "it.smg.hu.service.ODAService.STOP_ACTION";
     public static final String STOP_VIDEO_INDICATION = "it.smg.hu.service.ODAService.STOP_VIDEO_INDICATION";
     public static final String FORCE_CLOSE_ACTION = "it.smg.hu.service.ODAService.FORCE_CLOSE_ACTION";
+    /** startService action that ends the running session the way a long press on Back does */
+    public static final String ACTION_QUIT = "it.smg.hu.service.ODAService.ACTION_QUIT";
 
     public static final String EXTRA_START_MODE = "startMode";
     public static final String MODE_USB = "modeUSB";
@@ -48,7 +52,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
 
     private LocalBroadcastManager localBroadcastManager_;
     private NotificationFactory notificationFactory_;
-    private AndroidAutoEntity androidAutoEntity_;
+    private volatile AndroidAutoEntity androidAutoEntity_;
 
     private  USBManager usbManager_;
     private  WIFIManager wifiManager_;
@@ -98,7 +102,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
                 try {
                     LibUsbDevice device = usbManager_.aoapDevice();
                     if (device.open()) {
-                        if (Log.isInfo()) Log.i(TAG, "device opened");
+                        if (Log.isInfo()) Log.i(TAG, "device opened, USB link speed " + USBManager.linkSpeed(device.originalDevice()));
                         androidAutoEntity_ = AndroidAutoEntityFactory.create(this, device, surfaceView, keyHolder);
                         androidAutoEntity_.start(this);
                         Settings.instance().connectivity.rememberDevice(USBManager.deviceId(device));
@@ -154,19 +158,65 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
         androidAutoEntity_.shutdown();
     }
 
+    // Focus calls come from the screen on the main thread and can race a session being stopped on the stop thread
+    // (seen: Exit, then the background screen resuming mid-stop and crashing in the deleted entity). isRunning_ is
+    // cleared before the entity is stopped, and deleting it takes entityLock_.
+    private final Object entityLock_ = new Object();
+
     public void releaseFocus(){
-        if (androidAutoEntity_ != null) {
-            androidAutoEntity_.releaseFocus();
+        synchronized (entityLock_) {
+            if (isRunning_ && androidAutoEntity_ != null) {
+                androidAutoEntity_.releaseFocus();
+            }
         }
     }
 
     public void gainFocus(){
-        androidAutoEntity_.gainFocus();
+        synchronized (entityLock_) {
+            if (isRunning_ && androidAutoEntity_ != null) {
+                androidAutoEntity_.gainFocus();
+            }
+        }
     }
 
     /** Ends the session, asynchronously on the stop thread. */
     public void stop(){
         stopExecutor_.execute(this::stopNow);
+    }
+
+    // a phone answers the shutdown request in milliseconds
+    private static final long QUIT_TIMEOUT_MS = 1000;
+    private volatile CountDownLatch quitAnswered_;
+
+    /**
+     * Ends the session the way a car does: asks the phone to shut down first, so it closes its side cleanly and
+     * reconnects on the next attach, instead of finding the USB link cut under a running session.
+     */
+    public void quit(){
+        stopExecutor_.execute(() -> {
+            AndroidAutoEntity entity = androidAutoEntity_;
+            if (isRunning_ && entity != null) {
+                CountDownLatch answered = new CountDownLatch(1);
+                quitAnswered_ = answered;
+                entity.requestShutdown();
+                try {
+                    if (!answered.await(QUIT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                        if (Log.isWarn()) Log.w(TAG, "phone didn't answer the shutdown request, stopping anyway");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                quitAnswered_ = null;
+            }
+            stopNow();
+        });
+    }
+
+    private void onSessionEnding(){
+        CountDownLatch answered = quitAnswered_;
+        if (answered != null) {
+            answered.countDown();
+        }
     }
 
     private synchronized void stopNow(){
@@ -187,9 +237,11 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
             androidAutoEntity_.stop();
         }
 
-        if (androidAutoEntity_ != null) {
-            androidAutoEntity_.delete();
-            androidAutoEntity_ = null;
+        synchronized (entityLock_) {
+            if (androidAutoEntity_ != null) {
+                androidAutoEntity_.delete();
+                androidAutoEntity_ = null;
+            }
         }
 
         startThread_ = null;
@@ -225,6 +277,10 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (Log.isDebug()) Log.d(TAG, "Received start id " + startId + ": " + intent);
+        if (intent != null && ACTION_QUIT.equals(intent.getAction())) {
+            if (Log.isInfo()) Log.i(TAG, "quit requested");
+            quit();
+        }
 
         Notification notification = notificationFactory_.create();
         startForeground(123456, notification);
@@ -238,6 +294,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     public void onAndroidAutoQuit() {
         // no error: the phone asked to stop, or stopped answering pings (the native log above says which)
         if (Log.isInfo()) Log.i(TAG, "Android Auto ended by the protocol, not by a USB or Wi-Fi error");
+        onSessionEnding();
         stop();
     }
 
@@ -245,6 +302,7 @@ public class ODAService extends Service implements IAndroidAutoEntityEventHandle
     @Override
     public void onAndroidAutoQuitOnError(String error, int nativeErrorCode){
         Log.e(TAG, "closing with error " + error + "(" + nativeErrorCode + ")");
+        onSessionEnding();
 
         mainHandler_.post(() -> {
             Toast.makeText(this, "Closed due to " + error + " error", Toast.LENGTH_LONG).show();

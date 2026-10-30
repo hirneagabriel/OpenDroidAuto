@@ -21,6 +21,8 @@ public class ODAApplication extends MultiDexApplication {
 
     private static final String TAG = "ODAApplication";
 
+    private ODALog log_;
+
     @Override
     public void onTerminate() {
         super.onTerminate();
@@ -46,7 +48,8 @@ public class ODAApplication extends MultiDexApplication {
 //        });
 
 //        Runtime.init(getApplicationContext());
-        Runtime.initLog(new ODALog());
+        log_ = new ODALog();
+        Runtime.initLog(log_);
     }
 
     public void onCreate() {
@@ -54,6 +57,7 @@ public class ODAApplication extends MultiDexApplication {
 
 //        if (Log.isDebug()) Log.d(TAG, "Initialized jni: " + Runtime.handle());
 
+        log_.watchStorage(getApplicationContext());
         USBManager.init(getApplicationContext());
         WIFIManager.init(getApplicationContext());
         AppBadge.init(getApplicationContext());

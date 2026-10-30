@@ -37,6 +37,15 @@ public abstract class VideoOutput implements IVideoOutput {
         return margin_;
     }
 
+    /**
+     * Frames received but still waiting for the decoder. While there are too many, the phone's next frame is not
+     * acknowledged, which makes it wait (see VideoService). 0 when the output doesn't queue.
+     */
+    @Keep
+    public int framesWaiting() {
+        return 0;
+    }
+
     @Override
     public void delete(){
         nativeDelete();

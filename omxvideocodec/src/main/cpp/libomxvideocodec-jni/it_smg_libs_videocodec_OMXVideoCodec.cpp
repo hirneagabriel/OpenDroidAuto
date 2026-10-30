@@ -45,6 +45,10 @@ void JOMXVideoCodec::takeStages(int64_t out[]) {
     omxVideoCodec_->takeStages(out);
 }
 
+int JOMXVideoCodec::queuedFrames() {
+    return omxVideoCodec_->queuedFrames();
+}
+
 JOMXVideoCodec::~JOMXVideoCodec() {
     if (Log::isVerbose()) Log_v("delete omxVideoCodec_");
     delete omxVideoCodec_;
@@ -141,4 +145,11 @@ Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeTakeStats(JNIEnv *env, jobjec
     jintArray result = env->NewIntArray(4 + OMXSource::cStageCount);
     env->SetIntArrayRegion(result, 0, 4 + OMXSource::cStageCount, values);
     return result;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_it_smg_libs_omxvideocodec_OMXVideoCodec_nativeQueuedFrames(JNIEnv *env, jobject thiz) {
+    JOMXVideoCodec::Pointer jOMXVideoCodec = JOMXVideoCodec::getJOMXVideoCodec(env, thiz);
+    return jOMXVideoCodec->queuedFrames();
 }

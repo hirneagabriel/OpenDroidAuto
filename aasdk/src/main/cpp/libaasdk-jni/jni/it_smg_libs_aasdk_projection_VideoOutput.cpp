@@ -23,6 +23,7 @@ void JVideoOutput::initJavaMethods() {
     initMethodId_ = env->GetMethodID(cls, "init", "()Z");
     writeMethodId_ = env->GetMethodID(cls, "write", "(JLjava/nio/ByteBuffer;)V" );
     stopMethodId_ = env->GetMethodID(cls, "stop", "()V");
+    framesWaitingMethodId_ = env->GetMethodID(cls, "framesWaiting", "()I");
     getVideoFPSMethodId_ = env->GetMethodID(cls, "getVideoFPS", "()I");
     getVideoResolutionMethodId_ = env->GetMethodID(cls, "getVideoResolution", "()I");
     getScreenDPIMethodId_ = env->GetMethodID(cls, "getScreenDPI", "()I");
@@ -62,13 +63,10 @@ void JVideoOutput::stop() {
 aasdk::proto::enums::VideoFPS::Enum JVideoOutput::getVideoFPS() {
     JNIEnv* env = getJniEnv();
     jint ret = env->CallIntMethod(androidClass_, getVideoFPSMethodId_);
-    //TODO: try to cast
-    switch (ret) {
-        case aasdk::proto::enums::VideoFPS_Enum__60:
-            return aasdk::proto::enums::VideoFPS_Enum__60;
-        default:
-            return aasdk::proto::enums::VideoFPS_Enum__30;
-    }
+    // Java returns frames per second (30 or 60). aasdk's enum has the two values the wrong way round: phones read
+    // 1 (named _30) as 60 fps and 2 (named _60) as 30 fps. Measured on the car: asked for 1 the phone sent up to
+    // 60 fps, asked for 2 it never went above 30.
+    return ret >= 60 ? aasdk::proto::enums::VideoFPS_Enum__30 : aasdk::proto::enums::VideoFPS_Enum__60;
 }
 
 aasdk::proto::enums::VideoResolution::Enum JVideoOutput::getVideoResolution() {
@@ -138,6 +136,11 @@ void JVideoOutput::write(uint64_t timestamp, const aasdk::common::DataConstBuffe
         byteBuffer = nullptr;
     }
 
+}
+
+int JVideoOutput::framesWaiting() {
+    JNIEnv* env = getJniEnv();
+    return env->CallIntMethod(androidClass_, framesWaitingMethodId_);
 }
 
 JVideoOutput::~JVideoOutput() {

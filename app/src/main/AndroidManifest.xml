@@ -46,7 +46,8 @@
         <activity android:name=".ui.SettingsActivity" android:label="Settings" android:screenOrientation="landscape" android:theme="@style/AppTheme.Wallpaper" android:windowSoftInputMode="adjustPan|stateHidden">
         </activity>
 
-        <activity android:name=".ui.PlayerActivity"  android:screenOrientation="landscape" android:launchMode="singleTask"> <!--android:excludeFromRecents="true" android:noHistory="true"-->
+        <!-- its own task: MainActivity is singleTask too, and reopening it (launcher, Back) would otherwise destroy the running Android Auto screen -->
+        <activity android:name=".ui.PlayerActivity"  android:screenOrientation="landscape" android:launchMode="singleTask" android:taskAffinity="it.smg.hu.player"> <!--android:excludeFromRecents="true" android:noHistory="true"-->
         </activity>
 
         <service android:enabled="true" android:name=".service.ODAService" android:exported="true">

@@ -69,12 +69,14 @@ void LibUsbEndpoint::bulkTransfer(common::DataBuffer buffer, uint32_t timeout, P
 void LibUsbEndpoint::transfer(libusb_transfer *transfer, Promise::Pointer promise) {
     strand_->dispatch([this, transfer, promise = std::move(promise)]() mutable {
         if (Log::isVerbose()) Log_v("libusb_submit_transfer");
+        std::unique_lock<std::mutex> lock(transfersMutex_);
         auto submitResult = libusb_submit_transfer(transfer);
         if (Log::isVerbose()) Log_v("libusb_submit_transfer %d", submitResult);
 
         if(submitResult == LIBUSB_SUCCESS) {
             transfers_.insert(std::make_pair(transfer, std::move(promise)));
         } else {
+            lock.unlock();
             promise->reject(error::Error(error::ErrorCode::USB_TRANSFER, submitResult));
             libusb_free_transfer(transfer);
         }
@@ -89,6 +91,7 @@ uint8_t LibUsbEndpoint::getAddress()
 void LibUsbEndpoint::cancelTransfers()
 {
     if (Log::isDebug()) Log_d("cancel transfers");
+    std::lock_guard<std::mutex> lock(transfersMutex_);
     for(const auto& transfer : transfers_) {
         libusb_cancel_transfer(transfer.first);
     }
@@ -99,13 +102,20 @@ void LibUsbEndpoint::transferHandler(libusb_transfer *transfer) {
     auto self = reinterpret_cast<LibUsbEndpoint*>(transfer->user_data);
 
     self->strand_->dispatch([self, transfer]() mutable {
-        if(self->transfers_.count(transfer) == 0) {
-            if (Log::isWarn()) Log_w("transfer not found in list");
-            return;
+        Promise::Pointer promise;
+        {
+            // take it out of the list before it is freed, so cancelTransfers() can't touch it any more
+            std::lock_guard<std::mutex> lock(self->transfersMutex_);
+            auto it = self->transfers_.find(transfer);
+            if(it == self->transfers_.end()) {
+                if (Log::isWarn()) Log_w("transfer not found in list");
+                return;
+            }
+            promise = std::move(it->second);
+            self->transfers_.erase(it);
         }
 
-        auto promise(std::move(self->transfers_.at(transfer)));
-
+        // outside the lock: resolving can submit the next transfer
         if(transfer->status == LIBUSB_TRANSFER_COMPLETED) {
             promise->resolve(transfer->actual_length);
         } else {
@@ -114,7 +124,6 @@ void LibUsbEndpoint::transferHandler(libusb_transfer *transfer) {
         }
 
         libusb_free_transfer(transfer);
-        self->transfers_.erase(transfer);
     });
 }
 

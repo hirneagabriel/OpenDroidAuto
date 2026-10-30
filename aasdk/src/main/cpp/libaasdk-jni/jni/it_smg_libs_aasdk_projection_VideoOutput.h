@@ -20,6 +20,7 @@ public:
     bool init() override;
     void write(uint64_t timestamp, const aasdk::common::DataConstBuffer& buffer) override;
     void stop() override;
+    int framesWaiting() override;
     aasdk::proto::enums::VideoFPS::Enum getVideoFPS() override;
     aasdk::proto::enums::VideoResolution::Enum getVideoResolution() override;
     size_t getScreenDPI() override;
@@ -31,6 +32,7 @@ private:
     jmethodID initMethodId_;
     jmethodID writeMethodId_;
     jmethodID stopMethodId_;
+    jmethodID framesWaitingMethodId_;
     jmethodID getVideoFPSMethodId_;
     jmethodID getVideoResolutionMethodId_;
     jmethodID getScreenDPIMethodId_;

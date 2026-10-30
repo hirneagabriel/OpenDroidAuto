@@ -124,6 +124,13 @@ void OMXVideoCodec::takeStats(uint32_t& rendered, int& maxQueued, int64_t& laten
     }
 }
 
+int OMXVideoCodec::queuedFrames() {
+    if (decoderThreadInitialized_ && omxSource_ != nullptr) {
+        return omxSource_->queuedFrames();
+    }
+    return 0;
+}
+
 void OMXVideoCodec::takeStages(int64_t out[]) {
     for (int i = 0; i < OMXSource::cStageCount; i++) out[i] = 0;
     if (decoderThreadInitialized_ && omxSource_ != nullptr) {

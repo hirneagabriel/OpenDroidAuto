@@ -83,6 +83,13 @@ public class OMXVideoOutput extends VideoOutput implements VideoStats.DecoderSta
     }
 
     // synchronized with stop(), which deletes the native codec
+    @Keep
+    @Override
+    public synchronized int framesWaiting() {
+        return videoCodec_ != null && running_ ? videoCodec_.queuedFrames() : 0;
+    }
+
+    // synchronized with stop(), which deletes the native codec
     @Override
     public synchronized int[] takeDecoderStats() {
         return videoCodec_ != null ? videoCodec_.takeStats() : null;

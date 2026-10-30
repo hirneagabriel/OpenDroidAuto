@@ -16,6 +16,7 @@ public class OMXVideoCodec {
     private native long nativeSetup();
     private native void nativeSurfaceInit(Object surface, int width, int height);
     private native int[] nativeTakeStats();
+    private native int nativeQueuedFrames();
     private native boolean nativeDecoderInit(int fps, boolean lowLatency, boolean releaseEarly);
     private native void nativeDelete();
     private native void nativeConsume(ByteBuffer buf, int len, long t);
@@ -88,6 +89,11 @@ public class OMXVideoCodec {
     }
 
     /** {frames rendered, peak decoder input queue length, arrival-to-screen avg ms, max ms} since the previous call. */
+    /** Frames received from the phone that are still waiting for the decoder. */
+    public int queuedFrames(){
+        return nativeQueuedFrames();
+    }
+
     public int[] takeStats(){
         return nativeTakeStats();
     }

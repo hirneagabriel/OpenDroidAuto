@@ -27,6 +27,7 @@ public final class LibUsbDevice {
     private native int nativeDeviceDescriptor();
     private native int nativeOpen(int fd);
     private native void nativeClose();
+    private native void nativeReset();
     private native byte[] nativeManufacter();
     private native byte[] nativeProduct();
     private native byte[] nativeSerial();
@@ -90,6 +91,14 @@ public final class LibUsbDevice {
             usbConnection_.close();
             usbConnection_ = null;
             if (Log.isVerbose()) Log.v(TAG, "closed android connection");
+        }
+    }
+
+    /** Resets the device's USB port: the phone drops off the bus and attaches again as if just plugged in. */
+    public void reset(){
+        if (open()) {
+            nativeReset();
+            close();
         }
     }
 

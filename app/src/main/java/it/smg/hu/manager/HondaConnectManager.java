@@ -338,12 +338,15 @@ public class HondaConnectManager {
                     if (Log.isVerbose()) Log.v(TAG, "notifySteeringMenuDispMode " + mode + " addr " + idx);
                     steeringMenuServiceIface_.notifySteeringMenuDispMode(idx, mode);
                 }
-            } catch (RemoteException e) {
+            } catch (RemoteException | RuntimeException e) {
                 Log.e(TAG, "Error registering", e);
             }
         }
     }
 
+    // The car's services report their own failures through these calls as runtime exceptions, e.g. the steering menu
+    // service throwing "beginBroadcast() called while already in a broadcast" for every registration after an app
+    // crash interrupted one of its callbacks (seen on the car until it restarted). Log them; never crash on them.
     private void registerSteeringMenuCallback(){
         if (Log.isDebug()) Log.d(TAG, "registerSteeringMenuCallback -> boundToSteeringMenuService= " + boundToSteeringMenuService_ + ", steeringMenuServiceCallback= " + (steeringMenuServiceCallback_ == null ? "null" : "not null"));
         try {
@@ -353,7 +356,7 @@ public class HondaConnectManager {
                 steeringMenuServiceCallback_ = new SteeringMenuServiceCallback();
                 steeringMenuServiceIface_.registerCallbackEx(steeringMenuServiceCallback_, idx);
             }
-        } catch (RemoteException e) {
+        } catch (RemoteException | RuntimeException e) {
             Log.e(TAG, "Error registerCallbackEx", e);
         }
     }
@@ -367,7 +370,7 @@ public class HondaConnectManager {
                 steeringMenuServiceIface_.unregisterCallbackEx(steeringMenuServiceCallback_, idx);
                 steeringMenuServiceCallback_ = null;
             }
-        } catch (RemoteException e) {
+        } catch (RemoteException | RuntimeException e) {
             Log.e(TAG, "Error unregisterCallbackEx", e);
         }
     }
@@ -401,7 +404,7 @@ public class HondaConnectManager {
                 } else if (Log.isWarn()) {
                     Log.w(TAG, "startVR failed again (" + ret + ")");
                 }
-            } catch (RemoteException e) {
+            } catch (RemoteException | RuntimeException e) {
                 Log.e(TAG, "startVR exception", e);
             }
         }
@@ -437,7 +440,7 @@ public class HondaConnectManager {
                 }
                 // even if endVr failed: otherwise every later startMicSession would return "already started"
                 micVrStarted_ = false;
-            } catch (RemoteException e) {
+            } catch (RemoteException | RuntimeException e) {
                 Log.e(TAG, "endVr exception", e);
             }
 
