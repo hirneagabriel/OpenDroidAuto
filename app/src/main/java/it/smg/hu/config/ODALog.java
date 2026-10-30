@@ -1,5 +1,9 @@
 package it.smg.hu.config;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Environment;
 import android.util.Log;
 
@@ -266,11 +270,48 @@ public class ODALog implements ILog {
         return Environment.MEDIA_MOUNTED.equals(state) || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
     }
 
+    /**
+     * Stops writing to the stick when it goes away and starts again when it is back. The car drops and re-detects
+     * the stick when it wakes from standby; vold then kills every process with a file open on it (logcat, and the
+     * app with it, ~1 min into the session), and only remounts the stick after that.
+     */
+    public void watchStorage(Context ctx){
+        IntentFilter filter = new IntentFilter(Intent.ACTION_MEDIA_MOUNTED);
+        filter.addAction(Intent.ACTION_MEDIA_EJECT);
+        filter.addAction(Intent.ACTION_MEDIA_BAD_REMOVAL);
+        filter.addAction(Intent.ACTION_MEDIA_UNMOUNTED);
+        filter.addDataScheme("file");
+        ctx.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String mountPath = intent.getData().getPath();
+                String logDir = new File(settings_.advanced.logDir()).getAbsolutePath();
+                if (!logDir.equals(mountPath) && !logDir.startsWith(mountPath + "/")) {
+                    return;
+                }
+                if (Intent.ACTION_MEDIA_MOUNTED.equals(intent.getAction())) {
+                    // keep the buffer: it holds what happened while the stick was away
+                    logcatExecutor_.execute(() -> {
+                        if (logProcess_ == null) initProcessLog(false, false);
+                    });
+                } else if (logProcess_ != null) {
+                    w_(TAG, "log dir " + logDir + " going away (" + intent.getAction() + "), stopping the log");
+                    logcatExecutor_.execute(() -> _deInit(false));
+                }
+            }
+        }, filter);
+    }
+
     private void _deInit(){
+        _deInit(true);
+    }
+
+    /** @param drain give logcat time to write what it has read; pointless when its file is already gone */
+    private void _deInit(boolean drain){
         if (logProcess_ != null){
             try {
                 v_(TAG, "Destroy log process");
-                Thread.sleep(1500);
+                if (drain) Thread.sleep(1500);
                 logProcess_.destroy();
                 v_(TAG, "Log process destroyed");
                 logProcess_ = null;
