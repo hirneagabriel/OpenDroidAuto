@@ -73,8 +73,14 @@ public class USBManager {
     private final LocalBroadcastManager localBroadcastManager_;
     // SystemClock.elapsedRealtime() until which a known phone is not started automatically
     private volatile long autoStartPausedUntil_;
-    // accessories this process saw attach (touched on the USB thread only)
-    private final java.util.Set<String> seenAccessories_ = new HashSet<>();
+    // accessories this process saw attach: only these may be started (added on the USB thread, read from the UI)
+    private final java.util.Set<String> seenAccessories_ = Collections.synchronizedSet(new HashSet<>());
+    // leftover accessories already reset (USB thread only): the device lingers in the list for a moment afterwards
+    private final java.util.Set<String> resetAccessories_ = new HashSet<>();
+    // SystemClock.elapsedRealtime() of this process's last switch to accessory mode: the phone attaching right after
+    // it is ours, even before its attach intent has been checked
+    private volatile long lastAoapRequest_;
+    private static final long AOAP_ATTACH_WINDOW_MS = 5000;
     // how long after start an attach intent that launched the app gets to be handled before a leftover is reset
     private static final long STALE_ACCESSORY_CHECK_DELAY_MS = 1500;
 
@@ -113,9 +119,12 @@ public class USBManager {
      */
     private void resetStaleAccessory(){
         UsbDevice accessory = attachedAccessory();
-        if (accessory == null || seenAccessories_.contains(accessory.getDeviceName()) || ODAService.isSessionActive()) {
+        if (accessory == null || seenAccessories_.contains(accessory.getDeviceName()) || ODAService.isSessionActive()
+                || resetAccessories_.contains(accessory.getDeviceName())
+                || SystemClock.elapsedRealtime() - lastAoapRequest_ < AOAP_ATTACH_WINDOW_MS) {
             return;
         }
+        resetAccessories_.add(accessory.getDeviceName());
         if (Log.isInfo()) Log.i(TAG, "phone " + accessory.getDeviceName() + " still in accessory mode from before, resetting it");
         libUsb_.createDevice(accessory, usbManager_).reset();
     }
@@ -297,10 +306,21 @@ public class USBManager {
         return Collections.EMPTY_LIST;
     }
 
+    /**
+     * Picks up a phone already in accessory mode, for the home page and the widget. Only one this process switched
+     * itself counts: any other is still in an old session (the car woke up, or the app was killed during a
+     * session), and starting Android Auto on it failed with SSL_READ. That one is reset instead, so it re-attaches
+     * and starts like a fresh plug-in.
+     */
     public void searchForAoapDevice(){
         UsbDevice dev = attachedAccessory();
-        if (dev != null) {
+        if (dev == null) {
+            return;
+        }
+        if (seenAccessories_.contains(dev.getDeviceName())) {
             usbDevice_ = libUsb_.createDevice(dev, usbManager_);
+        } else {
+            usbExecutor_.execute(this::resetStaleAccessory);
         }
     }
 
@@ -317,6 +337,7 @@ public class USBManager {
     }
 
     public boolean requestAOAP(UsbDevice device){
+        lastAoapRequest_ = SystemClock.elapsedRealtime();
         UsbDeviceConnection usbConnection = usbManager_.openDevice(device);
         if (usbConnection != null){
             try {

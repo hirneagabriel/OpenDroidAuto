@@ -38,7 +38,9 @@ public class ODALog implements ILog {
         setLogLevel_(settings_.advanced.logLevel());
         setLogProtocol_(settings_.advanced.logProtocol());
 
-        initProcessLog();
+        // keep what the buffer still holds: after the car wakes up or the app was killed, it is the only record of
+        // how the previous run ended (a leftover phone's SSL_READ was wiped by clearing it here)
+        initProcessLog(false, true);
     }
 
     @Override
@@ -72,11 +74,14 @@ public class ODALog implements ILog {
     }
 
     private void initProcessLog(){
-        initProcessLog(true);
+        initProcessLog(true, true);
     }
 
-    /** @param clear empty logcat's buffer first; false keeps what this run logged while waiting for the stick */
-    private void initProcessLog(boolean clear){
+    /**
+     * @param clear empty logcat's buffer first, so the new file doesn't repeat the previous one
+     * @param waitForDir if the log dir isn't there yet, start logging when it appears
+     */
+    private void initProcessLog(boolean clear, boolean waitForDir){
         if (logProcess_ != null){
             _deInit();
         }
@@ -90,7 +95,7 @@ public class ODALog implements ILog {
 
                 if (!extStoragePath.trim().isEmpty()) {
                     File extStorageDir = new File(extStoragePath);
-                    if (!extStorageDir.exists() && clear) {
+                    if (!extStorageDir.exists() && waitForDir) {
                         w_(TAG, "log dir " + extStorageDir + " not there yet, waiting for it");
                         logcatExecutor_.execute(() -> waitForLogDir(extStorageDir));
                     }
@@ -169,7 +174,7 @@ public class ODALog implements ILog {
         }
         if (dir.exists() && logProcess_ == null) {
             i_(TAG, "log dir " + dir + " appeared, starting the log");
-            initProcessLog(false);
+            initProcessLog(false, false);
         }
     }
 
