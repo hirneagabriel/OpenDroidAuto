@@ -14,7 +14,9 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
+# No inlining, so crash traces from the car name the real method (e.g. initAudioBinding, not onResume)
+-dontoptimize
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.

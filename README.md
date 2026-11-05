@@ -33,6 +33,10 @@ Your phone needs the Android Auto app. Wireless Android Auto is not supported di
 
 The home page and the widget show the state at a glance: grey means no phone, blue means a phone is ready or Android Auto is running.
 
+### Whitelisting
+
+Honda Connect only gives car audio and the steering buttons to apps on its whitelist. If OpenDroidAuto isn't on it, the app shows *"This car unit does not list the app in its whitelist"* when Android Auto starts, and audio or the steering buttons may not work. Add it with Mike's Honda whitelisting app (`com.xda_user.honda.permissions`, from XDA): install it from a USB stick like OpenDroidAuto, open it, add OpenDroidAuto (`it.smg.hu`) to the whitelist, then restart the car.
+
 ### Settings worth knowing
 
 | Where | Setting | Why |

@@ -23,6 +23,7 @@ import com.fujitsu_ten.displayaudio.whitelist.common.Constants;
 import com.fujitsu_ten.displayaudio.whitelist.common.IWhiteList;
 import com.fujitsu_ten.displayaudio.whitelist.common.ProcessControl;
 
+import it.smg.hu.R;
 import it.smg.hu.config.Settings;
 import it.smg.libs.aasdk.messenger.ChannelId;
 import it.smg.libs.common.Log;
@@ -78,6 +79,8 @@ public class HondaConnectManager {
     private final Settings settings_;
 
     private boolean hasAudioFocus_;
+    // the car gave no ProcessControl; told the user once in initialize()
+    private boolean noProcessControl_;
     private ProcessControl pControl_;
 //    private CountDownLatch waitCond_;
 
@@ -170,6 +173,15 @@ public class HondaConnectManager {
             }
         } catch (Throwable t){
             Log.e(TAG, "process control error", t);
+        }
+
+        // Units that don't list it.smg.hu in their whitelist return null (or throw); every
+        // method below reads authType, so fall back to the non-preinstall path
+        if (pControl_ == null) {
+            if (Log.isWarn()) Log.w(TAG, "no ProcessControl, assuming THIRD_PARTY");
+            pControl_ = new ProcessControl();
+            pControl_.authType = Constants.AUTH_TYPE_THIRD_PARTY;
+            noProcessControl_ = true;
         }
 
     }
@@ -278,6 +290,11 @@ public class HondaConnectManager {
     // Used in onCreate
     public void initialize(){
         if (Log.isDebug()) Log.d(TAG, "initialize -> app with auth " + pControl_.authType);
+
+        if (noProcessControl_) {
+            noProcessControl_ = false;
+            Toast.makeText(context_, R.string.honda_no_process_control, Toast.LENGTH_LONG).show();
+        }
 
         bindToEcNcService();
         bindToWheelService();
